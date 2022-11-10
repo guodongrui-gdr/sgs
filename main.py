@@ -79,7 +79,7 @@ def Pandin_Process(player):
 
 
 # 使用牌流程
-def Use_Card_process(card: card, player: Player):
+def Use_Card_process(card: card, player: player):
     time_id = 0
     while time_id < len(use_card_process):
         time = use_card_process[time_id]
@@ -169,8 +169,8 @@ def Use_Card_process(card: card, player: Player):
 
 
 # 伤害流程
-def Damage_Process(source: Player or card,
-                   hurt_player: Player,
+def Damage_Process(source: player or card,
+                   hurt_player: player,
                    damage_num: int,
                    is_shuxing: bool):
     """
@@ -193,7 +193,7 @@ def Damage_Process(source: Player or card,
 
 
 # 扣减体力流程(造成伤害事件)
-def Deducted_HP_Process(hurt_player: Player, damage_num):
+def Deducted_HP_Process(hurt_player: player, damage_num):
     for time in deducted_HP_process:
         # check_skill(time)
         if time == 'when_deducted_HP':
@@ -205,7 +205,7 @@ def Deducted_HP_Process(hurt_player: Player, damage_num):
 
 
 # 濒死流程
-def binsi(binsi_player: Player):
+def binsi(binsi_player: player):
     for time in binsi_process:
         # check_skill
         if time == 'when_binsi':
@@ -231,11 +231,13 @@ def binsi(binsi_player: Player):
 
 
 # 死亡流程
-def death_process(dead_player: Player):
+def death_process(dead_player: player):
     # 确认身份前
     global players
     print('死亡角色身份为:{}'.format(dead_player.identity))
     players_tmp = players
+    dead_player.pre.next = dead_player.next
+    dead_player.next.pre = dead_player.pre
     del players[players.index(dead_player)]
     vic = check_vic(dead_player)
     if vic != 0:
@@ -271,6 +273,8 @@ def cal_dis(player):  # 计算距离
 
     player_tmp = player
     dis = 0
+    if player.equipment_area['horse-1'].name is not None:
+        dis -= 1
     while player_tmp.pre != player:
         dis += 1
         if player_tmp.pre.equipment_area['horse+1'].name is not None:
@@ -296,7 +300,7 @@ def print_player(player):  # 打印玩家信息
 
 
 # 检查是否满足游戏胜利条件
-def check_vic(dead_player: Player) -> int:
+def check_vic(dead_player: player) -> int:
     '''
 
     dead_player: 死亡角色
