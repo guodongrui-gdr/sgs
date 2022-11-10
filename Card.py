@@ -240,7 +240,7 @@ class Get_Card_Heap:  # 摸牌堆
         self.card_list = card_heap_cache.copy()
         del card_heap_cache
 
-    def shuffle(self):  # 洗牌
+    def shuffle(self, left_card_heap):  # 洗牌
         card_heap_cache = []  # 创建一个缓存区用于存放牌
         for i in range(len(left_card_heap.card_list)):
             idx = random.randint(0, len(self.left_card_heap.card_list) - 1)
@@ -289,6 +289,6 @@ class Identity_Card_Heap:  # 身份牌堆
         return return_card
 
 
-class left_card_heap:  # 弃牌堆
+class Left_Card_Heap:  # 弃牌堆
     def __init__(self):
         self.card_list = []
