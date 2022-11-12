@@ -11,10 +11,11 @@ class player:
         self.idx = 0  # 座次
         self.identity = ''  # 身份信息
         self.equipment_area = {  # 装备区
-            'weapon': Card.weapon_card(None, None, None, None),
-            'armour': Card.armour_card(None, None, None),
-            'horse+1': Card.attack_horse_card(None, None, None),
-            'horse-1': Card.defense_horse_card(None, None, None)
+            '武器': Card.weapon_card(None, None, None, None),
+            '防具': Card.armour_card(None, None, None),
+            '进攻坐骑': Card.defense_horse_card(None, None, None),
+            '防御坐骑': Card.attack_horse_card(None, None, None),
+            '宝物': Card.treasure_card(None, None, None)
         }
         self.HandCards_area = []  # 手牌区
         self.pandin_area = []  # 判定区

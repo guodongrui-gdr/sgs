@@ -7,11 +7,11 @@ def cal_dis(player, player_list):  # 计算距离
     res = {}
     player_tmp = player
     dis = 0
-    if player.equipment_area['horse-1'].name is not None:
+    if player.equipment_area['进攻坐骑'].name is not None:
         dis -= 1
     while player_tmp.next != player:
         dis += 1
-        if player_tmp.next.equipment_area['horse+1'].name is not None:
+        if player_tmp.next.equipment_area['防御坐骑'].name is not None:
             res_next[player_tmp.next.idx] = dis + 1
         else:
             res_next[player_tmp.next.idx] = dis
@@ -19,11 +19,11 @@ def cal_dis(player, player_list):  # 计算距离
 
     player_tmp = player
     dis = 0
-    if player.equipment_area['horse-1'].name is not None:
+    if player.equipment_area['进攻坐骑'].name is not None:
         dis -= 1
     while player_tmp.pre != player:
         dis += 1
-        if player_tmp.pre.equipment_area['horse+1'].name is not None:
+        if player_tmp.pre.equipment_area['防御坐骑'].name is not None:
             res_pre[player_tmp.pre.idx] = dis + 1
         else:
             res_pre[player_tmp.pre.idx] = dis
@@ -39,10 +39,11 @@ def print_player(player):  # 打印玩家信息
     print('{}号位'.format(player.idx))
     print('武将为:{}'.format(player.commander.name))
     print('当前体力值为:{}/{}'.format(player.current_HP, player.max_HP))
-    print('装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{}'.format(player.equipment_area['weapon'].name,
-                                                       player.equipment_area['armour'].name,
-                                                       player.equipment_area['horse-1'].name,
-                                                       player.equipment_area['horse+1'].name))
+    print('装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(player.equipment_area['武器'].name,
+                                                             player.equipment_area['防具'].name,
+                                                             player.equipment_area['进攻坐骑'].name,
+                                                             player.equipment_area['防御坐骑'].name,
+                                                             player.equipment_area['宝物'].name))
 
 
 # 检查是否满足游戏胜利条件

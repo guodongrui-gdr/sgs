@@ -81,13 +81,15 @@ binsi_process = ['when_into_binsi',  # 进入濒死状态时
 def Game_Process(player: Player,
                  player_list: list,
                  get_card_heap: Get_Card_Heap,
-                 left_card_heap: Left_Card_Heap):
+                 left_card_heap: Left_Card_Heap,
+                 tmp_card):
     """
 
-    :param player: 当前回合角色
-    :param player_list: 所以玩家列表
-    :param get_card_heap: 摸牌堆
-    :param left_card_heap: 弃牌堆
+    player: 当前回合角色
+    player_list: 所以玩家列表
+    get_card_heap: 摸牌堆
+    left_card_heap: 弃牌堆
+    tmp_card: 处理区
 
     """
     game_process_tmp = game_process.copy()
@@ -121,19 +123,37 @@ def Game_Process(player: Player,
             while 1:
                 print('你当前体力值为:{}/{}'.format(player.current_HP, player.max_HP))
                 print('你的势力为:{}'.format(player.identity))
+                print('装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(player.equipment_area['武器'].name,
+                                                                         player.equipment_area['防具'].name,
+                                                                         player.equipment_area['进攻坐骑'].name,
+                                                                         player.equipment_area['防御坐骑'].name,
+                                                                         player.equipment_area['宝物'].name))
                 handcards = [[card.name, card.color, card.point] for card in player.HandCards_area]
                 print('你当前有的手牌为:{}'.format(handcards))
-                isEnd = eval(input('是否结束出牌阶段(0表示否, 1表示是):'))
-                if isEnd != 0:
+                while 1:
+                    isEnd = input('是否结束出牌阶段(0表示否, 1表示是):')
+                    try:
+                        isEnd = eval(isEnd)
+                    except SyntaxError and NameError:
+                        continue
+                    break
+                if isEnd == 1:
                     player.jiu = 0
                     player.use_sha_count = 0
                     player.use_jiu_count = 0
                     break
-                idx = eval(input('请选择你要使用第几张牌:')) - 1
-                Use_Card_process(player.HandCards_area[idx], player, player_list, get_card_heap, left_card_heap)
-                print('当前场上所有角色信息为:')
-                for i in player_list:
-                    print_player(i)
+                elif isEnd == 0:
+                    while 1:
+                        idx = eval(input('请选择你要使用第几张牌:')) - 1
+                        try:
+                            card = player.HandCards_area[idx]
+                        except IndexError:
+                            continue
+                        Use_Card_process(card, player, player_list, get_card_heap, left_card_heap,tmp_card)
+                        break
+                    print('当前场上所有角色信息为:')
+                    for i in player_list:
+                        print_player(i)
         elif time == 'leftcard':
             while len(player.HandCards_area) > player.max_HandCards:
                 print('你当前有的手牌为:{}'.format([[card.name, card.color, card.point] for card in player.HandCards_area]))
@@ -174,6 +194,7 @@ def Use_Card_process(card: card,
                      player_list,
                      get_card_heap: Get_Card_Heap,
                      left_card_heap: Left_Card_Heap,
+                     tmp_card: list,
                      target_card: card = None, ):
     """
 
@@ -181,6 +202,7 @@ def Use_Card_process(card: card,
     player: 使用牌的玩家
     get_card_heap: 摸牌堆
     left_card_heap: 弃牌堆
+    tmp_card: 处理区
     target_card: 如果被使用的牌的目标是牌,则输入目标牌
 
     """
@@ -191,31 +213,52 @@ def Use_Card_process(card: card,
         if player.use_sha_count == 1:
             print('不能再使用杀了')
             return
-        if player.equipment_area['weapon'].name is not None:  # 如果未装备武器牌,则杀的距离为1
-            card.dis = player.equipment_area['weapon'].dis
+        if player.equipment_area['武器'].name is not None:  # 如果未装备武器牌,则杀的距离为1
+            card.dis = player.equipment_area['武器'].dis
     elif card.name == '桃':
         if player.current_HP == player.max_HP:  # 若当前玩家体力值等于体力上限,则无法指定自己为目标
             return
 
     # 选择目标
     # check_skill()
+    target = []
     if card.target is None:
         legal_target = [k for k, v in cal_dis(player, player_list).items() if v <= card.dis]
         if len(legal_target) > 0:
             print('你能选择的目标有:')
             for target in legal_target:
                 print_player(target)
-            target_idx = eval(input('请选择目标:'))
-            target = [i for i in legal_target if i.idx == target_idx]
+            while 1:
+                target_idx = input('请选择目标:')
+                try:
+                    target_idx = eval(target_idx)
+                except SyntaxError:
+                    continue
+                target = [i for i in legal_target if i.idx == target_idx]
+                if len(target) > 0:
+                    break
         else:
             return
+    elif 'player' in card.target:
+        target = [player]
+    elif '杀' in card.target:
+        if target_card is not None:
+            target = [target_card]
+        else:
+            return
+    elif 'players exclude current_player' in card.target:
+        tmp = player
+        while tmp.next != player:
+            target.append(tmp.next)
+            tmp = tmp.next
+    elif 'all players' in card.target:
+        tmp = player
+        while tmp != player:
+            target.append(tmp.next)
+            tmp = tmp.next
     elif (np.array([player.current_HP for player in player_list]).any() <= 0) and ('binsi_player' in card.target):
         binsi_player = [player for player in player_list if player.current_HP <= 0]
         target = binsi_player
-    elif 'player' in card.target:
-        target = [player]
-    elif card.target == '杀':
-        target = target_card
 
     # 使用时
     # check_skill()
@@ -247,46 +290,86 @@ def Use_Card_process(card: card,
     # checkskill
 
     # 使用结算准备结算结束时
+    if card.name == '五谷丰登':
+        for i in range(len(player_list)):
+            tmp_card.append(get_card_heap.get_card(1)[0])
+        print([card.name for card in tmp_card])
+        Use_Clear_Process(player, player_list, card, target, get_card_heap,left_card_heap,tmp_card)
+        return
+    if type(card) == yanshi_jinnang_card:
+        target[0].pandin_area.append(card)
+        return
     if type(card) is weapon_card:
-        if player.equipment_area['weapon'] != '':
-            left_card_heap.card_list.append(player.equipment_area['weapon'])
-        player.equipment_area['weapon'] = card
+        if player.equipment_area['武器'] is not None:
+            left_card_heap.card_list.append(player.equipment_area['武器'])
+        player.equipment_area['武器'] = card
     elif type(card) is armour_card:
-        if player.equipment_area['armour'] != '':
-            left_card_heap.card_list.append(player.equipment_area['armour'])
-        player.equipment_area['armour'] = card
+        if player.equipment_area['防具'] is not None:
+            left_card_heap.card_list.append(player.equipment_area['防具'])
+        player.equipment_area['防具'] = card
     elif type(card) is attack_horse_card:
-        if player.equipment_area['horse-1'] != '':
-            left_card_heap.card_list.append(player.equipment_area['horse-1'])
-        player.equipment_area['horse-1'] = card
+        if player.equipment_area['进攻坐骑'] is not None:
+            left_card_heap.card_list.append(player.equipment_area['进攻坐骑'])
+        player.equipment_area['进攻坐骑'] = card
     elif type(card) is defense_horse_card:
-        if player.equipment_area['horse+1'] != '':
-            left_card_heap.card_list.append(player.equipment_area['horse+1'])
-        player.equipment_area['horse+1'] = card
+        if player.equipment_area['防御坐骑'] is not None:
+            left_card_heap.card_list.append(player.equipment_area['防御坐骑'])
+        player.equipment_area['防御坐骑'] = card
+    elif type(card) is treasure_card:
+        if player.equipment_area['宝物'] is not None:
+            left_card_heap.card_list.append(player.equipment_area['宝物'])
+        player.equipment_area['宝物'] = card
 
-    return Use_Clear_Process(player, player_list, card, target, get_card_heap, left_card_heap)
+    return Use_Clear_Process(player, player_list, card, target, get_card_heap, left_card_heap,tmp_card)
 
 
 # 使用生效的流程
-def Use_Clear_Process(player: player,player_list, card: Card, target: player, get_card_heap, left_card_heap):
+def Use_Clear_Process(player: player,
+                      player_list,
+                      card: card,
+                      target: list,
+                      get_card_heap,
+                      left_card_heap,
+                      tmp_card):
+    """
+
+    player: 使用玩家
+    player_list: 玩家列表
+    card: 被使用的牌
+    target: 目标列表
+    get_card_heap: 摸牌堆
+    left_card_heap: 弃牌堆
+
+    """
     for i in range(len(target)):
         # 首先判定此牌对当前目标是否有效,若无效,则不会生成'使用结算开始时'时机
 
         # 使用结算开始时
         # checkskill()
         # 然后若此牌对当前目标无效,则不会生成'生效前'时机
-
+        if card.name == '桃园结义' and target[i].current_HP == target[i].max_HP:
+            continue
         # 生效前
         if '杀' in card.name:
-            print('{}号位手牌为{}'.format(target[i].idx,
-                                     [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
-            shan_idx = target[i].HandCards_area[eval(input('{}号位是否出闪, 0表示不出闪, i表示出第i张牌'.format(target[i].idx))) - 1]
-            shan = 0
-            if shan_idx.name == '闪':
-                shan = Use_Card_process(shan_idx, target[i], player_list, get_card_heap, left_card_heap, card)
-            if shan:
-                return
-                # 生效时
+            for k in range(card.need_shan):
+                print('{}号位手牌为{}'.format(target[i].idx,
+                                         [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
+                while 1:
+                    player_input = input('{}号位是否出闪, 0表示不出闪, i表示出第i张牌'.format(target[i].idx))
+                    try:
+                        player_input = eval(player_input)
+                    except SyntaxError:
+                        continue
+                    if not player_input:
+                        break
+                    try:
+                        shan_idx = target[i].HandCards_area[player_input - 1]
+                    except IndexError:
+                        continue
+                    if shan_idx.name == '闪':
+                        Use_Card_process(shan_idx, target[i], player_list, get_card_heap, left_card_heap, tmp_card, card)
+                        break
+        # 生效时
 
         # 生效后
         if '杀' in card.name:
@@ -299,7 +382,12 @@ def Use_Clear_Process(player: player,player_list, card: Card, target: player, ge
         elif card.name == '桃' and target[i].current_HP <= 0:
             target[i].current_HP += 1
             target[i].max_HandCards += 1
-
+        elif card.name == '五谷丰登':
+            target[i].HandCards_area.append(tmp_card[eval(input('{}号位请选择获得一张牌:'.format(target[i].idx)))-1])
+            print([card.name for card in tmp_card])
+        elif card.name == '桃园结义':
+            target[i].current_HP += 1
+            target[i].max_HandCards += 1
     left_card_heap.card_list.append(card)
 
 

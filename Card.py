@@ -28,11 +28,11 @@ class basic_card(card):
             else:
                 self.is_shuxing = False
         if self.name == '酒':
-            self.target = 'player'
+            self.target = ['player']
         elif self.name == '桃':
             self.target = ['player', 'binsi_player']
         elif self.name == '闪':
-            self.target = '杀'
+            self.target = ['杀']
 
 
 # 锦囊牌
@@ -48,12 +48,11 @@ class common_jinnang_card(jinnang_card):
         if name == '顺手牵羊':
             self.dis = 1
         elif name == '万箭齐发' or '南蛮入侵':
-            self.target = 'players exclude current_player'
+            self.target = ['players exclude current_player']
         elif name == '五谷丰登' or '桃园结义':
-            self.target = 'all players'
+            self.target = ['all players']
         elif name == '无中生有':
-            self.target = 'player'
-
+            self.target = ['player']
 
 
 # 延时锦囊牌
@@ -63,7 +62,7 @@ class yanshi_jinnang_card(jinnang_card):
         if name == '兵粮寸断':
             self.dis = 1
         elif name == '闪电':
-            self.target = 'current_player'
+            self.target = 'player'
 
 
 # 装备牌
@@ -108,6 +107,73 @@ class defense_horse_card(equipment_card):
 class treasure_card(equipment_card):
     def __init__(self, name, color, point):
         super(treasure_card, self).__init__(name, color, point)
+
+
+class Get_Card_Heap:  # 摸牌堆
+    def __init__(self):
+        self.card_list = card_list
+
+    def init_card_heap(self):  # 初始化摸牌堆
+        card_heap_cache = []  # 创建一个缓存区用于存放牌
+        for i in range(len(card_list)):
+            idx = random.randint(0, len(self.card_list) - 1)
+            card_heap_cache.append(self.card_list[idx])
+            del self.card_list[idx]
+        self.card_list = card_heap_cache.copy()
+        del card_heap_cache
+
+    def shuffle(self, left_card_heap):  # 洗牌
+        card_heap_cache = []  # 创建一个缓存区用于存放牌
+        for i in range(len(left_card_heap.card_list)):
+            idx = random.randint(0, len(self.left_card_heap.card_list) - 1)
+            card_heap_cache.append(self.left_card_heap.card_list[idx])
+            del self.left_card_heap.card_list[idx]
+        self.card_list = card_heap_cache.copy()
+        del card_heap_cache
+
+    def get_card(self, num):  # 摸n张牌
+        """
+
+        num: 摸牌数量
+
+        """
+        return_card = []
+        if len(self.card_list) >= num:
+            return_card = self.card_list[:num]
+            del self.card_list[:num]
+        else:
+            return_card = self.card_list
+            self.shuffle()
+            return_card = return_card + self.get_card(num - len(return_card))
+        return return_card
+
+
+class Identity_Card_Heap:  # 身份牌堆
+    def __init__(self):
+        self.card_dic = {2: ['主公', '反贼'],
+                         4: ['主公', '忠臣', '内奸', '反贼'],
+                         5: ['主公', '忠臣', '内奸', '反贼', '反贼'],
+                         }
+        self.card_list = []
+
+    def init_card_heap(self, player_num):  # 初始化身份牌堆
+        card_heap_cache = []  # 创建一个缓存区用于存放牌
+        for i in range(len(self.card_dic[player_num])):
+            idx = random.randint(0, len(self.card_dic[player_num]) - 1)
+            card_heap_cache.append(self.card_dic[player_num][idx])
+            del self.card_dic[player_num][idx]
+        self.card_list = card_heap_cache.copy()
+        del card_heap_cache
+
+    def get_identity(self):
+        return_card = self.card_list[0]
+        del self.card_list[0]
+        return return_card
+
+
+class Left_Card_Heap:  # 弃牌堆
+    def __init__(self):
+        self.card_list = []
 
 
 card_list = [basic_card('普通杀', '黑桃', 7),
@@ -230,6 +296,8 @@ card_list = [basic_card('普通杀', '黑桃', 7),
              defense_horse_card('的卢', '梅花', 5),
              defense_horse_card('骅骝', '方块', 13),
 
+             treasure_card('木牛流马', '方块', 5),
+
              common_jinnang_card('决斗', '黑桃', 1),
              common_jinnang_card('决斗', '梅花', 1),
              common_jinnang_card('决斗', '方块', 1),
@@ -296,70 +364,3 @@ card_list = [basic_card('普通杀', '黑桃', 7),
              yanshi_jinnang_card('兵粮寸断', '梅花', 4),
 
              ]
-
-
-class Get_Card_Heap:  # 摸牌堆
-    def __init__(self):
-        self.card_list = card_list
-
-    def init_card_heap(self):  # 初始化摸牌堆
-        card_heap_cache = []  # 创建一个缓存区用于存放牌
-        for i in range(len(card_list)):
-            idx = random.randint(0, len(self.card_list) - 1)
-            card_heap_cache.append(self.card_list[idx])
-            del self.card_list[idx]
-        self.card_list = card_heap_cache.copy()
-        del card_heap_cache
-
-    def shuffle(self, left_card_heap):  # 洗牌
-        card_heap_cache = []  # 创建一个缓存区用于存放牌
-        for i in range(len(left_card_heap.card_list)):
-            idx = random.randint(0, len(self.left_card_heap.card_list) - 1)
-            card_heap_cache.append(self.left_card_heap.card_list[idx])
-            del self.left_card_heap.card_list[idx]
-        self.card_list = card_heap_cache.copy()
-        del card_heap_cache
-
-    def get_card(self, num):  # 摸n张牌
-        """
-
-        num: 摸牌数量
-
-        """
-        return_card = []
-        if len(self.card_list) >= num:
-            return_card = self.card_list[:num]
-            del self.card_list[:num]
-        else:
-            return_card = self.card_list
-            self.shuffle()
-            return_card = return_card + self.get_card(num - len(return_card))
-        return return_card
-
-
-class Identity_Card_Heap:  # 身份牌堆
-    def __init__(self):
-        self.card_dic = {2: ['主公', '反贼'],
-                         4: ['主公', '忠臣', '内奸', '反贼'],
-                         5: ['主公', '忠臣', '内奸', '反贼', '反贼'],
-                         }
-        self.card_list = []
-
-    def init_card_heap(self, player_num):  # 初始化身份牌堆
-        card_heap_cache = []  # 创建一个缓存区用于存放牌
-        for i in range(len(self.card_dic[player_num])):
-            idx = random.randint(0, len(self.card_dic[player_num]) - 1)
-            card_heap_cache.append(self.card_dic[player_num][idx])
-            del self.card_dic[player_num][idx]
-        self.card_list = card_heap_cache.copy()
-        del card_heap_cache
-
-    def get_identity(self):
-        return_card = self.card_list[0]
-        del self.card_list[0]
-        return return_card
-
-
-class Left_Card_Heap:  # 弃牌堆
-    def __init__(self):
-        self.card_list = []
