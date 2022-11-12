@@ -22,14 +22,17 @@ class basic_card(card):
         super(basic_card, self).__init__(name, color, point, target=None)
         if '杀' in self.name:
             self.dis = 1
+            self.need_shan = 1  # 抵消杀所需闪的数量
             if ('火' or '雷') in self.name:
                 self.is_shuxing = True
             else:
                 self.is_shuxing = False
         if self.name == '酒':
             self.target = 'player'
-        if self.name == '桃':
+        elif self.name == '桃':
             self.target = ['player', 'binsi_player']
+        elif self.name == '闪':
+            self.target = '杀'
 
 
 # 锦囊牌

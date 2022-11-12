@@ -4,7 +4,6 @@ from Card import *
 from Other import *
 import numpy as np
 
-
 # 游戏流程
 game_process = ['bef_huihe_start',  # 回合开始前
                 'when_huihe_start',  # 回合开始时
@@ -153,13 +152,11 @@ def Pandin_Process(player, get_card_heap, left_card_heap):
             left_card_heap.card_list.append(res_card)
     return res
 
-# 使用牌流程
-def Use_Card_process(card: card, player: player):
-    time_id = 0
-    time = use_card_process[time_id]
 
+# 使用牌流程
+def Use_Card_process(card: card, player: player, target_card: card, left_card_heap: Left_Card_Heap):
     # 声明使用牌后
-    # check_skill(time)
+    # check_skill()
     if '杀' in card.name:
         if player.use_sha_count == 1:
             print('不能再使用杀了')
@@ -168,9 +165,10 @@ def Use_Card_process(card: card, player: player):
             card.dis = player.equipment_area['weapon'].dis
     elif card.name == '桃':
         if player.current_HP == player.max_HP:  # 若当前玩家体力值等于体力上限,则无法指定自己为目标
-            return 
+            return
 
-    # 选择目标时
+            # 选择目标
+    # check_skill()
     if card.target is None:
         legal_target = [k for k, v in cal_dis(player).items() if v <= card.dis]
         if len(legal_target) > 0:
@@ -180,68 +178,87 @@ def Use_Card_process(card: card, player: player):
             target_idx = eval(input('请选择目标:'))
             target = [i for i in legal_target if i.idx == target_idx]
         else:
-            break
+            return
     elif (np.array([player.current_HP for player in player_list]).any() <= 0) and ('binsi_player' in card.target):
-        binsi_player = [player for player in player_list if player.current_HP <= 0][0]
+        binsi_player = [player for player in player_list if player.current_HP <= 0]
         target = binsi_player
     elif 'player' in card.target:
-        target = player
-    elif time == 'when_use':
-        if '杀' in card.name:
-            player.use_sha_count += 1
-        if card.name == '酒':
-            if player.current_HP > 0:
-                player.use_jiu_count += 1
-                player.jiu += 1
-            else:
-                player.current_HP += 1
-                player.max_HandCards += 1
-        del player.HandCards_area[player.HandCards_area.index(card)]
-    elif time == 'when_specified_target':
+        target = [player]
+    elif card.target == '杀':
+        target = target_card
 
-    elif time == 'bef_effect':
-        if '杀' in card.name:
-            for i in range(len(target)):
-                print('{}号位手牌为{}'.format(target[i].idx,
-                                         [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
-                shan = eval(input('{}号位是否出闪, 0表示不出闪, i表示出第i张闪'.format(target[i].idx)))
-
-                if shan:
-                    left_card_heap.card_list.append(target[i].HandCards_area[shan - 1])
-                    del target[i].HandCards_area[shan - 1]
-                    time_id = len(use_card_process)
-    elif time == 'when_pre_clear_end':
-        if type(card) is weapon_card:
-            if player.equipment_area['weapon'] != '':
-                left_card_heap.card_list.append(player.equipment_area['weapon'])
-            player.equipment_area['weapon'] = card
-            break
-        elif type(card) is armour_card:
-            if player.equipment_area['armour'] != '':
-                left_card_heap.card_list.append(player.equipment_area['armour'])
-            player.equipment_area['armour'] = card
-            break
-        elif type(card) is attack_horse_card:
-            if player.equipment_area['horse-1'] != '':
-                left_card_heap.card_list.append(player.equipment_area['horse-1'])
-            player.equipment_area['horse-1'] = card
-            break
-        elif type(card) is defense_horse_card:
-            if player.equipment_area['horse+1'] != '':
-                left_card_heap.card_list.append(player.equipment_area['horse+1'])
-            player.equipment_area['horse+1'] = card
-            break
-
-    elif time == 'af_effect':
-        if '杀' in card.name:
-            if not (shan):
-                Damage_Process(player, target[target_idx], 1 + player.jiu, card.is_shuxing)
-        if card.name == '桃' and target == player:
+    # 使用时
+    # check_skill()
+    if '杀' in card.name:
+        player.use_sha_count += 1
+    if card.name == '酒':
+        if player.current_HP > 0:
+            player.use_jiu_count += 1
+            player.jiu += 1
+        else:
             player.current_HP += 1
-            player.max_HandCards = player.current_HP
-        elif card.name == '桃' and target == binsi_player:
-            binsi_player.current_HP += 1
-            binsi_player.max_HandCards += 1
+            player.max_HandCards += 1
+    del player.HandCards_area[player.HandCards_area.index(card)]
+
+    # 指定目标时
+    # for t in target:
+    # checkskill
+
+    # 成为目标时
+    # for t in target:
+    # checkskill
+
+    # 指定目标后
+    # for t in target:
+    # checkskill
+
+    # 成为目标后
+    # for t in target:
+    # checkskill
+
+    # 使用结算准备结算结束时
+    if type(card) is weapon_card:
+        if player.equipment_area['weapon'] != '':
+            left_card_heap.card_list.append(player.equipment_area['weapon'])
+        player.equipment_area['weapon'] = card
+    elif type(card) is armour_card:
+        if player.equipment_area['armour'] != '':
+            left_card_heap.card_list.append(player.equipment_area['armour'])
+        player.equipment_area['armour'] = card
+    elif type(card) is attack_horse_card:
+        if player.equipment_area['horse-1'] != '':
+            left_card_heap.card_list.append(player.equipment_area['horse-1'])
+        player.equipment_area['horse-1'] = card
+    elif type(card) is defense_horse_card:
+        if player.equipment_area['horse+1'] != '':
+            left_card_heap.card_list.append(player.equipment_area['horse+1'])
+        player.equipment_area['horse+1'] = card
+
+
+# 使用生效的流程
+def Use_Clear_Process(player:player, card: Card, target, left_card_heap):
+    # 使用结算开始时
+
+    # 生效前
+    if '杀' in card.name:
+        for i in range(len(target)):
+            print('{}号位手牌为{}'.format(target[i].idx,
+                                     [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
+            shan = target[i].HandCards_area[eval(input('{}号位是否出闪, 0表示不出闪, i表示出第i张牌'.format(target[i].idx)))-1][0]
+            if shan.name == '闪':
+                Use_Card_process(shan, target, card, left_card_heap)
+    # 生效时
+
+    # 生效后
+    if '杀' in card.name:
+        if not (shan):
+            Damage_Process(player, target[target_idx], 1 + player.jiu, card.is_shuxing)
+    if card.name == '桃' and target == player:
+        player.current_HP += 1
+        player.max_HandCards = player.current_HP
+    elif card.name == '桃' and target == binsi_player:
+        binsi_player.current_HP += 1
+        binsi_player.max_HandCards += 1
 
     time_id += 1
     left_card_heap.card_list.append(card)
