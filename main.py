@@ -19,7 +19,7 @@ if __name__ == '__main__':
     get_card_heap.init_card_heap()  # 初始化摸牌堆
     identity_card_heap = Identity_Card_Heap()
     identity_card_heap.init_card_heap(player_num)  # 初始化身份牌堆
-    left_card_heap = left_card_heap()
+    left_card_heap = Left_Card_Heap()
 
     # 抽取身份
     for i in range(player_num):
@@ -69,6 +69,6 @@ if __name__ == '__main__':
         for player in players:
             current_player = player
             print('当前回合角色为:{}号位 {}'.format(current_player.idx, current_player.commander.name))
-            Game_Process(player)
+            Game_Process(player, players, get_card_heap, left_card_heap)
 
         round += 1

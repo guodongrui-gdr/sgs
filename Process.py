@@ -1,5 +1,4 @@
 # 流程
-from Player import *
 from Card import *
 from Other import *
 import numpy as np
@@ -83,6 +82,14 @@ def Game_Process(player: Player,
                  player_list: list,
                  get_card_heap: Get_Card_Heap,
                  left_card_heap: Left_Card_Heap):
+    """
+
+    :param player: 当前回合角色
+    :param player_list: 所以玩家列表
+    :param get_card_heap: 摸牌堆
+    :param left_card_heap: 弃牌堆
+
+    """
     game_process_tmp = game_process.copy()
     isEnd = 0
     for time in game_process_tmp:
@@ -92,7 +99,7 @@ def Game_Process(player: Player,
                 pandin_name = player.pandin_area[-1].name
                 print('即将判定{}'.format(pandin_name))
                 # ask_wuxiekeji()
-                result = Pandin_Process(player)
+                result = Pandin_Process(player, get_card_heap, left_card_heap)
                 if pandin_name == '兵粮寸断':
                     if result[0] != '梅花':
                         del game_process_tmp[7:10]
@@ -103,7 +110,7 @@ def Game_Process(player: Player,
                     if (result[0] == '黑桃') & (result[1] >= 2) & (result[1] <= 9):
                         player.current_HP -= 3
                         if player.current_HP <= 0:
-                            binsi(player)
+                            binsi(player, player, len(player_list))
                 left_card_heap.card_list.append(player.pandin_area[-1])
                 del player.pandin_area[-1]
         elif time == 'getcard':
@@ -123,7 +130,7 @@ def Game_Process(player: Player,
                     player.use_jiu_count = 0
                     break
                 idx = eval(input('请选择你要使用第几张牌:')) - 1
-                Use_Card_process(player.HandCards_area[idx], player)
+                Use_Card_process(player.HandCards_area[idx], player, player_list, get_card_heap, left_card_heap)
                 print('当前场上所有角色信息为:')
                 for i in player_list:
                     print_player(i)
@@ -143,18 +150,41 @@ def Game_Process(player: Player,
 
 # 判定流程
 def Pandin_Process(player, get_card_heap, left_card_heap):
+    """
+
+    player: 判定角色
+    get_card_heap: 摸牌堆
+    left_card_heap: 弃牌堆
+    return: 判定结果
+
+    """
     for time in pandin_process:
         # check_skill(time) 检查是否有武将技能发动
         if time == 'when_pandin':
             res_card = get_card_heap.get_card(1)
             res = [res_card[0].color, res_card[0].point]
-            print(res)
+            print('判定结果为:',res)
             left_card_heap.card_list.append(res_card)
     return res
 
 
 # 使用牌流程
-def Use_Card_process(card: card, player: player, target_card: card, left_card_heap: Left_Card_Heap):
+def Use_Card_process(card: card,
+                     player: player,
+                     player_list,
+                     get_card_heap: Get_Card_Heap,
+                     left_card_heap: Left_Card_Heap,
+                     target_card: card = None, ):
+    """
+
+    card: 被使用的牌
+    player: 使用牌的玩家
+    get_card_heap: 摸牌堆
+    left_card_heap: 弃牌堆
+    target_card: 如果被使用的牌的目标是牌,则输入目标牌
+
+    """
+
     # 声明使用牌后
     # check_skill()
     if '杀' in card.name:
@@ -167,10 +197,10 @@ def Use_Card_process(card: card, player: player, target_card: card, left_card_he
         if player.current_HP == player.max_HP:  # 若当前玩家体力值等于体力上限,则无法指定自己为目标
             return
 
-            # 选择目标
+    # 选择目标
     # check_skill()
     if card.target is None:
-        legal_target = [k for k, v in cal_dis(player).items() if v <= card.dis]
+        legal_target = [k for k, v in cal_dis(player, player_list).items() if v <= card.dis]
         if len(legal_target) > 0:
             print('你能选择的目标有:')
             for target in legal_target:
@@ -234,33 +264,42 @@ def Use_Card_process(card: card, player: player, target_card: card, left_card_he
             left_card_heap.card_list.append(player.equipment_area['horse+1'])
         player.equipment_area['horse+1'] = card
 
+    return Use_Clear_Process(player, player_list, card, target, get_card_heap, left_card_heap)
+
 
 # 使用生效的流程
-def Use_Clear_Process(player:player, card: Card, target, left_card_heap):
-    # 使用结算开始时
+def Use_Clear_Process(player: player,player_list, card: Card, target: player, get_card_heap, left_card_heap):
+    for i in range(len(target)):
+        # 首先判定此牌对当前目标是否有效,若无效,则不会生成'使用结算开始时'时机
 
-    # 生效前
-    if '杀' in card.name:
-        for i in range(len(target)):
+        # 使用结算开始时
+        # checkskill()
+        # 然后若此牌对当前目标无效,则不会生成'生效前'时机
+
+        # 生效前
+        if '杀' in card.name:
             print('{}号位手牌为{}'.format(target[i].idx,
                                      [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
-            shan = target[i].HandCards_area[eval(input('{}号位是否出闪, 0表示不出闪, i表示出第i张牌'.format(target[i].idx)))-1][0]
-            if shan.name == '闪':
-                Use_Card_process(shan, target, card, left_card_heap)
-    # 生效时
+            shan_idx = target[i].HandCards_area[eval(input('{}号位是否出闪, 0表示不出闪, i表示出第i张牌'.format(target[i].idx))) - 1]
+            shan = 0
+            if shan_idx.name == '闪':
+                shan = Use_Card_process(shan_idx, target[i], player_list, get_card_heap, left_card_heap, card)
+            if shan:
+                return
+                # 生效时
 
-    # 生效后
-    if '杀' in card.name:
-        if not (shan):
-            Damage_Process(player, target[target_idx], 1 + player.jiu, card.is_shuxing)
-    if card.name == '桃' and target == player:
-        player.current_HP += 1
-        player.max_HandCards = player.current_HP
-    elif card.name == '桃' and target == binsi_player:
-        binsi_player.current_HP += 1
-        binsi_player.max_HandCards += 1
+        # 生效后
+        if '杀' in card.name:
+            target[i].current_HP -= 1 + player.jiu
+        elif card.name == '闪':
+            return 1
+        elif card.name == '桃' and target[i] == player:
+            player.current_HP += 1
+            player.max_HandCards = player.current_HP
+        elif card.name == '桃' and target.current_HP <= 0:
+            target[i].current_HP += 1
+            target[i].max_HandCards += 1
 
-    time_id += 1
     left_card_heap.card_list.append(card)
 
 
@@ -301,7 +340,7 @@ def Deducted_HP_Process(hurt_player: player, damage_num):
 
 
 # 濒死流程
-def binsi(binsi_player: player):
+def binsi(binsi_player: player, current_player: player, player_num):
     for time in binsi_process:
         # check_skill
         if time == 'when_binsi':
