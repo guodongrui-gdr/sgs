@@ -296,7 +296,7 @@ def Use_Clear_Process(player: player,player_list, card: Card, target: player, ge
         elif card.name == '桃' and target[i] == player:
             player.current_HP += 1
             player.max_HandCards = player.current_HP
-        elif card.name == '桃' and target.current_HP <= 0:
+        elif card.name == '桃' and target[i].current_HP <= 0:
             target[i].current_HP += 1
             target[i].max_HandCards += 1
 

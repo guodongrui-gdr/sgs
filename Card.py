@@ -47,10 +47,13 @@ class common_jinnang_card(jinnang_card):
         super(common_jinnang_card, self).__init__(name, color, point)
         if name == '顺手牵羊':
             self.dis = 1
-        elif name == '万箭齐发' or name == '南蛮入侵':
+        elif name == '万箭齐发' or '南蛮入侵':
             self.target = 'players exclude current_player'
-        elif name == '五谷丰登':
+        elif name == '五谷丰登' or '桃园结义':
             self.target = 'all players'
+        elif name == '无中生有':
+            self.target = 'player'
+
 
 
 # 延时锦囊牌
@@ -210,14 +213,14 @@ card_list = [basic_card('普通杀', '黑桃', 7),
              weapon_card('方天画戟', '方块', 12, 4),
              weapon_card('朱雀羽扇', '方块', 1, 4),
              weapon_card('麒麟弓', '红桃', 5, 5),
-             '''
+
              armour_card('八卦阵', '黑桃', 2),
              armour_card('八卦阵', '梅花', 2),
              armour_card('白银狮子', '梅花', 1),
              armour_card('仁王盾', '梅花', 2),
              armour_card('藤甲', '黑桃', 2),
              armour_card('藤甲', '梅花', 2),
-''',
+
              attack_horse_card('大宛', '黑桃', 13),
              attack_horse_card('赤兔', '红桃', 5),
              attack_horse_card('紫骍', '黑桃', 13),
@@ -226,6 +229,71 @@ card_list = [basic_card('普通杀', '黑桃', 7),
              defense_horse_card('爪黄飞电', '红桃', 13),
              defense_horse_card('的卢', '梅花', 5),
              defense_horse_card('骅骝', '方块', 13),
+
+             common_jinnang_card('决斗', '黑桃', 1),
+             common_jinnang_card('决斗', '梅花', 1),
+             common_jinnang_card('决斗', '方块', 1),
+
+             common_jinnang_card('无中生有', '红桃', 7),
+             common_jinnang_card('无中生有', '红桃', 8),
+             common_jinnang_card('无中生有', '红桃', 9),
+             common_jinnang_card('无中生有', '红桃', 11),
+
+             common_jinnang_card('过河拆桥', '黑桃', 3),
+             common_jinnang_card('过河拆桥', '黑桃', 4),
+             common_jinnang_card('过河拆桥', '黑桃', 12),
+             common_jinnang_card('过河拆桥', '红桃', 12),
+             common_jinnang_card('过河拆桥', '梅花', 3),
+             common_jinnang_card('过河拆桥', '梅花', 4),
+
+             common_jinnang_card('顺手牵羊', '黑桃', 3),
+             common_jinnang_card('顺手牵羊', '黑桃', 4),
+             common_jinnang_card('顺手牵羊', '黑桃', 11),
+             common_jinnang_card('顺手牵羊', '方块', 3),
+             common_jinnang_card('顺手牵羊', '方块', 4),
+
+             common_jinnang_card('借刀杀人', '梅花', 12),
+             common_jinnang_card('借刀杀人', '梅花', 13),
+
+             common_jinnang_card('南蛮入侵', '黑桃', 7),
+             common_jinnang_card('南蛮入侵', '黑桃', 12),
+             common_jinnang_card('南蛮入侵', '梅花', 7),
+
+             common_jinnang_card('万箭齐发', '红桃', 1),
+
+             common_jinnang_card('桃园结义', '红桃', 1),
+
+             common_jinnang_card('五谷丰登', '红桃', 3),
+             common_jinnang_card('五谷丰登', '红桃', 4),
+
+             common_jinnang_card('无懈可击', '黑桃', 11),
+             common_jinnang_card('无懈可击', '黑桃', 13),
+             common_jinnang_card('无懈可击', '梅花', 12),
+             common_jinnang_card('无懈可击', '梅花', 13),
+             common_jinnang_card('无懈可击', '方块', 12),
+             common_jinnang_card('无懈可击', '红桃', 1),
+             common_jinnang_card('无懈可击', '红桃', 12),
+
+             common_jinnang_card('火攻', '红桃', 2),
+             common_jinnang_card('火攻', '红桃', 3),
+             common_jinnang_card('火攻', '方块', 12),
+
+             common_jinnang_card('铁索连环', '黑桃', 11),
+             common_jinnang_card('铁索连环', '黑桃', 12),
+             common_jinnang_card('铁索连环', '梅花', 10),
+             common_jinnang_card('铁索连环', '梅花', 11),
+             common_jinnang_card('铁索连环', '梅花', 12),
+             common_jinnang_card('铁索连环', '梅花', 13),
+
+             yanshi_jinnang_card('乐不思蜀', '黑桃', 6),
+             yanshi_jinnang_card('乐不思蜀', '红桃', 6),
+             yanshi_jinnang_card('乐不思蜀', '梅花', 6),
+
+             yanshi_jinnang_card('闪电', '黑桃', 1),
+             yanshi_jinnang_card('闪电', '红桃', 12),
+
+             yanshi_jinnang_card('兵粮寸断', '黑桃', 10),
+             yanshi_jinnang_card('兵粮寸断', '梅花', 4),
 
              ]
 
