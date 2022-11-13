@@ -182,7 +182,7 @@ def Use_Card_process(card: card,
                      get_card_heap: Get_Card_Heap,
                      left_card_heap: Left_Card_Heap,
                      tmp_card: List[player],
-                     target_card: card = None, ):
+                     target_card: card = None):
     """
 
     card: 被使用的牌
@@ -196,6 +196,7 @@ def Use_Card_process(card: card,
 
     # 声明使用牌后
     # check_skill()
+    b_target = []
     if '杀' in card.name:
         if player.use_sha_count == 1:
             print('不能再使用杀了')
@@ -220,6 +221,10 @@ def Use_Card_process(card: card,
                 if len(target.pandin_area) > 0:
                     if card.name in [k.name for k in target.pandin_area]:
                         legal_target.remove(target)
+        if card.name == '借刀杀人':
+            for target in legal_target:
+                if target.equipment_area['武器'].name is None:
+                    legal_target.remove(target)
         if len(legal_target) > 0:
             print('你能选择的目标有:')
             for target in legal_target:
@@ -233,6 +238,21 @@ def Use_Card_process(card: card,
                 target = [i for i in legal_target if i.idx == target_idx]
                 if len(target) > 0:
                     break
+            if card.name == '借刀杀人':
+                b_target: List[player] = [k for k, v in cal_dis(target[0], player_list).items()
+                                          if v <= target[0].equipment_area['武器'].dis]
+                print('你能选择的目标有:')
+                for target in b_target:
+                    print_player(target)
+                while 1:
+                    target_idx = input('请选择被杀目标:')
+                    try:
+                        target_idx = eval(target_idx)
+                    except SyntaxError:
+                        continue
+                    b_target = [i for i in b_target if i.idx == target_idx]
+                    if len(target) > 0:
+                        break
         else:
             return
     elif 'player' in card.target:
@@ -320,7 +340,8 @@ def Use_Card_process(card: card,
             left_card_heap.card_list.append(player.equipment_area['宝物'])
         player.equipment_area['宝物'] = card
         card.player = player
-
+    if len(b_target)>0:
+        return Use_Clear_Process(player, player_list, card, target, get_card_heap, left_card_heap, tmp_card, b_target)
     return Use_Clear_Process(player, player_list, card, target, get_card_heap, left_card_heap, tmp_card)
 
 
@@ -331,7 +352,8 @@ def Use_Clear_Process(player: player,
                       target: List[player],
                       get_card_heap,
                       left_card_heap,
-                      tmp_card):
+                      tmp_card,
+                      b_target: player = None):
     """
 
     player: 使用玩家
@@ -340,7 +362,7 @@ def Use_Clear_Process(player: player,
     target: 目标列表
     get_card_heap: 摸牌堆
     left_card_heap: 弃牌堆
-
+    b_target: 借刀杀人指定的被杀目标
     """
     for i in range(len(target)):
         # 首先判定此牌对当前目标是否有效,若无效,则不会生成'使用结算开始时'时机
@@ -405,6 +427,24 @@ def Use_Clear_Process(player: player,
                     continue
                 if shan_idx.name == '闪':
                     break
+        elif card.name == '借刀杀人':
+            while 1:
+                player_input = input('请出杀，否则武器将被夺走')
+                try:
+                    player_input = eval(player_input)
+                except SyntaxError:
+                    continue
+                if not player_input:
+                    break
+                try:
+                    sha_idx = target[i].HandCards_area[player_input - 1]
+                except IndexError:
+                    continue
+                if '杀' in sha_idx.name:
+                    sha_idx.target = b_target
+                    Use_Card_process(sha_idx, target[i], player_list,
+                                     get_card_heap, left_card_heap, tmp_card)
+
         # 生效时
 
         # 生效后
@@ -501,7 +541,8 @@ def Use_Clear_Process(player: player,
                 get_card = target[i].HandCards_area[player_input]
                 player.HandCards_area.append(get_card)
                 del target[i].HandCards_area[player_input]
-            
+        # elif card.name == '借刀杀人':
+
     if len(tmp_card) > 0:
         for i in tmp_card:
             left_card_heap.card_list.append(i)
