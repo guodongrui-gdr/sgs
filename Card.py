@@ -14,6 +14,7 @@ class card:
         self.point = point  # 点数
         self.target = target  # 目标
         self.dis = dis  # 距离
+        self.is_shuxing = False
 
 
 # 基本牌
@@ -25,8 +26,6 @@ class basic_card(card):
             self.need_shan = 1  # 抵消杀所需闪的数量
             if ('火' or '雷') in self.name:
                 self.is_shuxing = True
-            else:
-                self.is_shuxing = False
         if self.name == '酒':
             self.target = ['player']
         elif self.name == '桃':
@@ -45,14 +44,16 @@ class jinnang_card(card):
 class common_jinnang_card(jinnang_card):
     def __init__(self, name, color, point):
         super(common_jinnang_card, self).__init__(name, color, point)
-        if name == '顺手牵羊':
+        if self.name == '顺手牵羊':
             self.dis = 1
-        elif name == '万箭齐发' or '南蛮入侵':
+        elif self.name == '万箭齐发' or self.name == '南蛮入侵':
             self.target = ['players exclude current_player']
-        elif name == '五谷丰登' or '桃园结义':
+        elif self.name == '五谷丰登' or self.name == '桃园结义':
             self.target = ['all players']
-        elif name == '无中生有':
+        elif self.name == '无中生有':
             self.target = ['player']
+        elif self.name == '火攻':
+            self.is_shuxing = True
 
 
 # 延时锦囊牌
@@ -125,13 +126,13 @@ class Get_Card_Heap:  # 摸牌堆
     def shuffle(self, left_card_heap):  # 洗牌
         card_heap_cache = []  # 创建一个缓存区用于存放牌
         for i in range(len(left_card_heap.card_list)):
-            idx = random.randint(0, len(self.left_card_heap.card_list) - 1)
-            card_heap_cache.append(self.left_card_heap.card_list[idx])
-            del self.left_card_heap.card_list[idx]
+            idx = random.randint(0, len(left_card_heap.card_list) - 1)
+            card_heap_cache.append(left_card_heap.card_list[idx])
+            del left_card_heap.card_list[idx]
         self.card_list = card_heap_cache.copy()
         del card_heap_cache
 
-    def get_card(self, num):  # 摸n张牌
+    def get_card(self, num, left_card_heap):  # 摸n张牌
         """
 
         num: 摸牌数量
@@ -143,8 +144,8 @@ class Get_Card_Heap:  # 摸牌堆
             del self.card_list[:num]
         else:
             return_card = self.card_list
-            self.shuffle()
-            return_card = return_card + self.get_card(num - len(return_card))
+            self.shuffle(left_card_heap)
+            return_card = return_card + self.get_card(num - len(return_card), left_card_heap)
         return return_card
 
 

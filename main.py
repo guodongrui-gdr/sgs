@@ -61,7 +61,7 @@ if __name__ == '__main__':
     # 分发起始手牌
     # check_skill()
     for player in players:
-        for start_card in get_card_heap.get_card(4):
+        for start_card in get_card_heap.get_card(4,left_card_heap):
             player.HandCards_area.append(start_card)
     # check_skill()
     # 回合开始
