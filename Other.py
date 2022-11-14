@@ -1,5 +1,8 @@
 from Player import player
+import numpy as np
 
+def isAreaEmpty(player:player)->bool:  # 判断玩家区域内是否有牌
+    if len(player.HandCards_area) and len(player.pandin_area) and np.array([v.name for k,v in player.equipment_area.items()]).all() is None
 
 def cal_dis(player, player_list):  # 计算距离
     res_next = {}

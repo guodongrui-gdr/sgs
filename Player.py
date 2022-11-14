@@ -19,8 +19,8 @@ class player:
         }
         self.HandCards_area = []  # 手牌区
         self.pandin_area = []  # 判定区
-        self.pre = None  # 上家
-        self.next = None  # 下家
+        self.pre: player = None  # 上家
+        self.next: player = None  # 下家
         self.use_sha_count = 0  # 使用杀的次数
         self.use_jiu_count = 0  # 使用酒的次数
         self.jiu = 0  # 是否喝酒

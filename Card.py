@@ -43,14 +43,15 @@ class common_jinnang_card(jinnang_card):
         super(common_jinnang_card, self).__init__(name, color, point)
         if self.name == '顺手牵羊':
             self.dis = 1
-        elif self.name == '万箭齐发' or self.name == '南蛮入侵':
-            self.target = ['players exclude current_player']
-        elif self.name == '五谷丰登' or self.name == '桃园结义':
+        elif self.name == '万箭齐发' or self.name == '南蛮入侵':  # 万箭齐发和南蛮入侵的目标为所有其他角色
+            self.target = ['all other players']
+        elif self.name == '五谷丰登' or self.name == '桃园结义':  # 桃园结义的目标为所有角色
             self.target = ['all players']
         elif self.name == '无中生有':
             self.target = ['player']
         elif self.name == '火攻':
             self.is_shuxing = True
+            self.target = ['one player']
 
 
 # 延时锦囊牌
@@ -76,7 +77,6 @@ class weapon_card(equipment_card):
     def __init__(self, name, color, point, dis):
         super(weapon_card, self).__init__(name, color, point)
         self.dis = dis
-
 
 
 # 防具牌

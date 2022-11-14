@@ -5,7 +5,7 @@ from Commander import Commander
 from Card import Get_Card_Heap, Identity_Card_Heap, Left_Card_Heap
 from Player import player
 
-player_num = 5  # 游戏人数
+player_num = 2  # 游戏人数
 print('游戏开始')
 commanders = []
 player_list = []

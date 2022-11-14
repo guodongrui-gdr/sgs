@@ -90,7 +90,10 @@ def Game_Process(player: player):
                         game_process_tmp.remove('when_usecard_end')
                 elif pandin_name == '闪电':
                     if (result[0] == '黑桃') & (result[1] >= 2) & (result[1] <= 9):
-                        Damage_Process(None, player, player, 3, True)
+                        Damage_Process(None, player.pandin_area[-1], player, player, 3, True)
+                    else:
+                        player.next.pandin_area.append(player.pandin_area[-1])
+                        del player.pandin_area[-1]
                 left_card_heap.card_list.append(player.pandin_area[-1])
                 del player.pandin_area[-1]
         elif time == 'getcard':
@@ -206,27 +209,31 @@ def Use_Card_process(card: Card.card,
     target = []
     if card.target is None:
         legal_target: List[player] = [k for k, v in cal_dis(player, player_list).items() if v <= card.dis]
-        if type(card) == Card.yanshi_jinnang_card:
-            for target in legal_target:
-                if len(target.pandin_area) > 0:
-                    if card.name in [k.name for k in target.pandin_area]:
-                        legal_target.remove(target)
+        if type(card) == Card.yanshi_jinnang_card:  # 若目标判定区内有同名牌,则不能成为合法目标
+            for t in legal_target:
+                if len(t.pandin_area) > 0:
+                    if card.name in [k.name for k in t.pandin_area]:
+                        legal_target.remove(t)
         if card.name == '借刀杀人':
             legal_target = []
-            for player in player_list:
-                if player.equipment_area['武器'].name is not None:
-                    legal_target.append(player)
-        if len(legal_target) > 0:
+            for p in player_list:  # 只有有武器的角色能成为合法目标
+                if p.equipment_area['武器'].name is not None:
+                    legal_target.append(p)
+        if
+        if len(legal_target) > 0:  # 若合法目标列表为空,则结束使用流程
             print('你能选择的目标有:')
-            for target in legal_target:
-                print_player(target)
+            for t in legal_target:
+                print_player(t)
             while 1:
-                target_idx = eval(input('请选择目标:'))
-                target = [i for i in legal_target if i.idx in target_idx]
+                target_idx = list(input('请选择目标:'))
+                for i in target_idx:
+                    for p in legal_target:
+                        if p.idx == int(i):
+                            target.append(p)
                 if len(target) > 0:
                     break
             if card.name == '借刀杀人':
-                target_2: List[player] = [k for k, v in cal_dis(target[0], player_list).items()
+                target_2: List[player] = [k for k, v in cal_dis(target[0], player_list).items()  # 被杀目标必须在借刀杀人的目标的攻击距离之内
                                           if v <= target[0].equipment_area['武器'].dis]
                 print('你能选择的目标有:')
                 for target in target_2:
@@ -257,11 +264,15 @@ def Use_Card_process(card: Card.card,
         for i in range(len(player_list)):
             target.append(tmp)
             tmp = tmp.next
-    elif 'players exclude current_player' in card.target:
+    elif 'all other players' in card.target:
         tmp = player
         while tmp.next != player:
             target.append(tmp.next)
             tmp = tmp.next
+    elif card.name == '火攻':  # 火攻的目标是一名有手牌的角色
+        for p in player_list:
+            if len(p.HandCard_area) > 0:
+                target.append(p)
 
     # 使用时
     # check_skill()
@@ -274,7 +285,7 @@ def Use_Card_process(card: Card.card,
         else:
             player.current_HP += 1
             player.max_HandCards += 1
-    del player.HandCards_area[player.HandCards_area.index(card)]
+    player.HandCards_area.remove(card)
 
     # 指定目标时
     # for t in target:
@@ -365,19 +376,24 @@ def Use_Clear_Process(player: player,
                     Use_Card_process(wuxie, j, card)
         if '杀' in card.name:
             shan = 0
-            for k in range(card.need_shan):
-                print('{}号位手牌为{}'.format(target[i].idx,
-                                         [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
-                player_input = eval(input('{}号位是否使用闪, 0表示不使用闪, i表示使用第i张牌'.format(target[i].idx)))
-                shan_idx = target[i].HandCards_area[player_input - 1]
-                if not player_input:
-                    break
-                if shan_idx.name == '闪':
-                    Use_Card_process(shan_idx, target[i], card)
-                    shan += 1
-            if shan == card.need_shan:
-                # 被抵消后
-                return
+            if '闪' not in [card.name for card in target[i].HandCards_area]:
+                pass
+            else:
+                for k in range(card.need_shan):
+                    print('{}号位手牌为{}'.format(target[i].idx,
+                                             [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
+
+                    player_input = eval(input('{}号位是否使用闪, 0表示不使用闪, i表示使用第i张牌'.format(target[i].idx)))
+                    if not player_input:
+                        break
+                    shan_idx = target[i].HandCards_area[player_input - 1]
+
+                    if shan_idx.name == '闪':
+                        Use_Card_process(shan_idx, target[i], card)
+                        shan += 1
+                if shan == card.need_shan:
+                    # 被抵消后
+                    return
         elif card.name == '南蛮入侵':
             print('{}号位手牌为{}'.format(target[i].idx,
                                      [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
@@ -416,7 +432,7 @@ def Use_Clear_Process(player: player,
 
         # 生效后
         if '杀' in card.name:
-            Damage_Process(player, player, target[i], 1 + player.jiu, card.is_shuxing)
+            Damage_Process(player, card, player, target[i], 1 + player.jiu, card.is_shuxing)
         elif card.name == '闪':
             return 1
         elif card.name == '桃':
@@ -442,12 +458,12 @@ def Use_Clear_Process(player: player,
             if show_card.color == left_card.color:
                 left_card_heap.card_list.append(left_card)
                 player.HandCards_area.remove(left_card)
-                Damage_Process(player, player, target[i], 1, True)
+                Damage_Process(player, card, player, target[i], 1, True)
         elif card.name == '桃园结义':
             target[i].current_HP += 1
             target[i].max_HandCards += 1
         elif card.name == '南蛮入侵' or card.name == '万箭齐发':
-            Damage_Process(player, player, target[i], 1, False)
+            Damage_Process(player, card, player, target[i], 1, False)
         elif card.name == '过河拆桥':
             left_card: Card.card = Card.card(None, None, None)
             while 1:
@@ -558,13 +574,13 @@ def Use_Clear_Process(player: player,
                         target[i].pandin_area.remove([card for card in target[i].pandin_area if card.name == '闪电'][0])
                         break
                 try:
-                    get_card = target[i].HandCards_area[player_input]
+                    get_card = target[i].HandCards_area[player_input - 1]
                     break
                 except (IndexError, TypeError):
                     continue
             if type(player_input) == int:
                 player.HandCards_area.append(get_card)
-                del target[i].HandCards_area[player_input]
+                del target[i].HandCards_area[player_input - 1]
         elif card.name == '借刀杀人':
             player.HandCards_area.append(target[i].equipment_area['武器'])
             del target[i].equipment_area['武器']
@@ -577,6 +593,7 @@ def Use_Clear_Process(player: player,
 
 # 伤害流程
 def Damage_Process(source,
+                   channel,
                    current_player,
                    hurt_player: player,
                    damage_num: int,
@@ -584,6 +601,7 @@ def Damage_Process(source,
     """
 
     source: 来源
+    channel: 渠道
     hurted_player: 受到伤害的角色
     damage_num: 伤害值
     is_shuxing: 是否为属性伤害
