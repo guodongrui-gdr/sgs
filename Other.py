@@ -1,4 +1,4 @@
-from Player import *
+from Player import player
 
 
 def cal_dis(player, player_list):  # 计算距离
@@ -36,9 +36,11 @@ def cal_dis(player, player_list):  # 计算距离
 
 
 def print_player(player):  # 打印玩家信息
+    hengzhi_dic = {True: '是',False: '否'}
     print('{}号位'.format(player.idx))
     print('武将为:{}'.format(player.commander.name))
     print('当前体力值为:{}/{}'.format(player.current_HP, player.max_HP))
+    print('是否被横置:{}'.format(hengzhi_dic[player.hengzhi]))
     print('装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(player.equipment_area['武器'].name,
                                                              player.equipment_area['防具'].name,
                                                              player.equipment_area['进攻坐骑'].name,

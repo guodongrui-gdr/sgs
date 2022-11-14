@@ -2,9 +2,6 @@
 
 import random
 
-import Player
-from Skill import *
-
 
 # 游戏牌
 class card:
@@ -71,7 +68,7 @@ class equipment_card(card):
     def __init__(self, name, color, point):
         super(equipment_card, self).__init__(name, color, point, target='current_player')
         self.dis = 0
-        self.player: Player = None
+        self.player = None
 
 
 # 武器牌
@@ -80,10 +77,6 @@ class weapon_card(equipment_card):
         super(weapon_card, self).__init__(name, color, point)
         self.dis = dis
 
-    def skill(self):
-        if self.name == '诸葛连弩':
-            self.player.use_sha_count = 0
-            Skill('锁定技', 'af_state_use', )
 
 
 # 防具牌
