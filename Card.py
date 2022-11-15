@@ -11,6 +11,8 @@ class card:
         self.point = point  # 点数
         self.target = target  # 目标
         self.dis = dis  # 距离
+        self.is_huoyan = False
+        self.is_leidian = False
         self.is_shuxing = False
 
 
@@ -20,8 +22,16 @@ class basic_card(card):
         super(basic_card, self).__init__(name, color, point, target=None)
         if '杀' in self.name:
             self.dis = 1
+            self.target = ['another player']
             self.need_shan = 1  # 抵消杀所需闪的数量
-            if ('火' or '雷') in self.name:
+            self.is_huoyan = False
+            self.is_leidian = False
+            self.is_shuxing = self.is_huoyan or self.is_leidian
+            if '火' in self.name:
+                self.is_huoyan = True
+                self.is_shuxing = True
+            elif '雷' in self.name:
+                self.leidian = True
                 self.is_shuxing = True
         if self.name == '酒':
             self.target = ['player']
@@ -42,16 +52,24 @@ class common_jinnang_card(jinnang_card):
     def __init__(self, name, color, point):
         super(common_jinnang_card, self).__init__(name, color, point)
         if self.name == '顺手牵羊':
+            self.target = ['another player']
             self.dis = 1
         elif self.name == '万箭齐发' or self.name == '南蛮入侵':  # 万箭齐发和南蛮入侵的目标为所有其他角色
             self.target = ['all other players']
-        elif self.name == '五谷丰登' or self.name == '桃园结义':  # 桃园结义的目标为所有角色
+        elif self.name == '五谷丰登' or self.name == '桃园结义':  # 五谷丰登和桃园结义的目标为所有角色
             self.target = ['all players']
         elif self.name == '无中生有':
             self.target = ['player']
         elif self.name == '火攻':
+            self.is_huoyan = True
             self.is_shuxing = True
             self.target = ['one player']
+        elif self.name == '铁索连环':
+            self.target = ['one player', 'two players']
+        elif self.name == '无懈可击':
+            self.target = []
+        else:
+            self.target = ['another player']
 
 
 # 延时锦囊牌
@@ -60,14 +78,19 @@ class yanshi_jinnang_card(jinnang_card):
         super(yanshi_jinnang_card, self).__init__(name, color, point)
         if name == '兵粮寸断':
             self.dis = 1
+            self.target = ['another player']
         elif name == '闪电':
-            self.target = 'player'
+            self.target = ['player']
+            self.is_leidian = True
+            self.is_shuxing = True
+        else:
+            self.target = ['another player']
 
 
 # 装备牌
 class equipment_card(card):
     def __init__(self, name, color, point):
-        super(equipment_card, self).__init__(name, color, point, target='current_player')
+        super(equipment_card, self).__init__(name, color, point, target='player')
         self.dis = 0
         self.player = None
 
@@ -260,7 +283,6 @@ card_list = [basic_card('普通杀', '黑桃', 7),
              basic_card('酒', '梅花', 3, ),
              basic_card('酒', '梅花', 9, ),
              basic_card('酒', '方块', 9, ),
-
              weapon_card('诸葛连弩', '梅花', 1, 1),
              weapon_card('诸葛连弩', '方块', 1, 1),
              weapon_card('雌雄双股剑', '黑桃', 2, 2),
@@ -358,3 +380,6 @@ card_list = [basic_card('普通杀', '黑桃', 7),
              yanshi_jinnang_card('兵粮寸断', '梅花', 4),
 
              ]
+'''
+
+'''
