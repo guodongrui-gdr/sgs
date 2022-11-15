@@ -1,8 +1,11 @@
 from Player import player
 import numpy as np
 
-def isAreaEmpty(player:player)->bool:  # 判断玩家区域内是否有牌
-    if len(player.HandCards_area) and len(player.pandin_area) and np.array([v.name for k,v in player.equipment_area.items()]).all() is None
+
+def isAreaEmpty(player: player) -> bool:  # 判断玩家区域内是否有牌
+    return len(player.HandCards_area) == 0 and len(player.pandin_area) == 0 and np.array(
+        [v.name for k, v in player.equipment_area.items()]).all() is None
+
 
 def cal_dis(player, player_list):  # 计算距离
     res_next = {}
@@ -39,7 +42,7 @@ def cal_dis(player, player_list):  # 计算距离
 
 
 def print_player(player):  # 打印玩家信息
-    hengzhi_dic = {True: '是',False: '否'}
+    hengzhi_dic = {True: '是', False: '否'}
     print('{}号位'.format(player.idx))
     print('武将为:{}'.format(player.commander.name))
     print('当前体力值为:{}/{}'.format(player.current_HP, player.max_HP))
