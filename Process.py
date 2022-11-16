@@ -1,10 +1,9 @@
 # 流程
 from typing import List
-import numpy as np
 
+import Card
 import Player
 from Other import *
-import Card
 from init import player_list, get_card_heap, left_card_heap, tmp_card
 
 # 游戏流程
@@ -207,7 +206,7 @@ def Use_Card_process(card: Card.card,
     elif card.name == '桃':
         if player.current_HP == player.max_HP:  # 若当前玩家体力值等于体力上限,则无法指定自己为目标
             return
-    elif card.name == '闪' and card.target is None:
+    elif card.name == '闪' and card.target == ['杀']:
         return
     # 选择目标
     # check_skill()
@@ -569,9 +568,9 @@ def Use_Clear_Process(player: player,
                                                                            target[i].equipment_area['防御坐骑'].name,
                                                                            target[i].equipment_area['宝物'].name))
                 print('目标判定区有:{}'.format([card.name for card in target[i].pandin_area]))
-                player_input = input('请选择一张牌弃置(i表示弃置第i张手牌,w表示弃置武器牌,a表示弃置防具牌,'
-                                     'j表示弃置进攻坐骑,f表示弃置防御坐骑,t表示弃置宝物牌,l表示弃置乐不思蜀,'
-                                     'b表示弃置兵粮寸断,s表示弃置闪电):')
+                player_input = input('请选择一张牌获得(i表示获得第i张手牌,w表示获得武器牌,a表示获得防具牌,'
+                                     'j表示获得进攻坐骑,f表示获得防御坐骑,t表示获得宝物牌,l表示获得乐不思蜀,'
+                                     'b表示获得兵粮寸断,s表示获得闪电):')
                 try:
                     player_input = eval(player_input)
                 except NameError:
@@ -631,12 +630,36 @@ def Use_Clear_Process(player: player,
                     sha_idx.target = b_target
                     Use_Card_process(sha_idx, target[i])
                     continue
+        elif card.name == '决斗':
+            new_list: List[Player.player] = [target[i], player]
+            j = 0
+            while 1:
+                k = 0
+                for card_name in [c.name for c in new_list[j].HandCards_area]:
+                    k += card_name.find('杀')
+                if k == -len(new_list[j].HandCards_area):
+                    if j:
+                        Damage_Process(new_list[0], card, player, new_list[1], 1, False)
+                    else:
+                        Damage_Process(new_list[1], card, player, new_list[0], 1, False)
 
+                else:
+                    print('{}号位手牌为{}'.format(new_list[j].idx,
+                                             [[card.name, card.color, card.point] for card in new_list[j].HandCards_area]))
+                player_input = eval(input('{}号位是否打出杀, 0表示不出杀, i表示出第i张牌'.format(new_list[j].idx)))
+                sha_idx = new_list[j].HandCards_area[player_input - 1]
+                if '杀' in sha_idx.name:
+                    j += 1
+                    if j == 2:
+                        j = 0
+                    continue
+                
     if len(tmp_card) > 0:
         for i in tmp_card:
             left_card_heap.card_list.append(i)
     left_card_heap.card_list.append(card)
     wuxie_count = 0
+
 
 # 伤害流程
 def Damage_Process(source,
@@ -736,14 +759,3 @@ def death_process(dead_player: player):
     # check_skill('when_dead')
     player_list = player_list_tmp
 
-
-def wuxie(player_list, card: Card.card):  # 询问无懈可击
-    for p in player_list:
-        if '无懈可击' not in [c.name for c in j.HandCards_area]:
-            continue
-        wuxie = eval(input('{}号位是否使用无懈可击(0表示不使用,i表示使用第i张牌):'.format(p.idx)))
-        if not wuxie:
-            continue
-        wuxie = p.HandCards_area[wuxie - 1]
-        if wuxie.name == '无懈可击':
-            Use_Card_process(wuxie, p, card)
