@@ -215,7 +215,7 @@ def Use_Card_process(card: Card.card,
     if isinstance(card.target, Player.player) or isinstance(card.target, Card.card):
         target.append(card.target)
     elif 'another player' in card.target:
-        legal_target: List[player] = [k for k, v in cal_dis(player, player_list).items() if v <= card.dis]
+        legal_target: List[player] = [p for p in player_list if p != player]
         if type(card) == Card.yanshi_jinnang_card:  # 若目标判定区内有同名牌,则不能成为合法目标
             for t in legal_target:
                 if len(t.pandin_area) > 0:
@@ -226,10 +226,11 @@ def Use_Card_process(card: Card.card,
             for p in player_list:  # 只有有武器的角色能成为合法目标
                 if p.equipment_area['武器'].name is not None and p is not player:
                     legal_target.append(p)
-        elif card.name == '顺手牵羊' or card.name == '过河拆桥':  # 过河拆桥和顺手牵羊的目标为区域里有牌的角色
+        elif card.name == '顺手牵羊':  # 过河拆桥和顺手牵羊的目标为区域里有牌的角色
             for t in legal_target:
                 if isAreaEmpty(t):
                     legal_target.remove(t)
+        elif card.name == '过河拆桥':
         if len(legal_target) > 0:  # 若合法目标列表为空,则结束使用流程
             print('你能选择的目标有:')
             for t in legal_target:
@@ -673,9 +674,11 @@ def Damage_Process(source,
 
     source: 来源
     channel: 渠道
+    current_player: 当前回合角色
     hurted_player: 受到伤害的角色
     damage_num: 伤害值
     is_shuxing: 是否为属性伤害
+    is_lianhuan: 是否为连环伤害
 
     """
 

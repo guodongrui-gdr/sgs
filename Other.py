@@ -13,9 +13,9 @@ def cal_dis(player, player_list):  # 计算距离
     res = {}
     player_tmp = player
     dis = 0
-    if player.equipment_area['进攻坐骑'].name is not None:
-        dis -= 1
+
     while player_tmp.next != player:
+        if player.equipment_area['进攻坐骑'].name is not None:
         dis += 1
         if player_tmp.next.equipment_area['防御坐骑'].name is not None:
             res_next[player_tmp.next.idx] = dis + 1

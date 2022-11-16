@@ -5,12 +5,11 @@ import random
 
 # 游戏牌
 class card:
-    def __init__(self, name, color, point, target=None, dis=99):
+    def __init__(self, name, color, point, target=None):
         self.name = name  # 牌名
         self.color = color  # 花色
         self.point = point  # 点数
         self.target = target  # 目标
-        self.dis = dis  # 距离
         self.is_huoyan = False
         self.is_leidian = False
         self.is_shuxing = False
@@ -158,10 +157,13 @@ class Get_Card_Heap:  # 摸牌堆
         if len(self.card_list) >= num:
             return_card = self.card_list[:num]
             del self.card_list[:num]
-        else:
+        elif len(left_card_heap.card_list) + len(self.card_list) >= num > len(self.card_list) >= 0:
             return_card = self.card_list
             self.shuffle(left_card_heap)
             return_card = return_card + self.get_card(num - len(return_card), left_card_heap)
+        elif len(left_card_heap.card_list) + len(self.card_list) < num:
+            print('游戏结束\n平局')
+            exit(0)
         return return_card
 
 
@@ -381,5 +383,187 @@ card_list = [basic_card('普通杀', '黑桃', 7),
 
              ]
 '''
+basic_card('普通杀', '黑桃', 7),
+             basic_card('普通杀', '黑桃', 8),
+             basic_card('普通杀', '黑桃', 8),
+             basic_card('普通杀', '黑桃', 9),
+             basic_card('普通杀', '黑桃', 9),
+             basic_card('普通杀', '黑桃', 10),
+             basic_card('普通杀', '黑桃', 10),
+             basic_card('普通杀', '红桃', 10),
+             basic_card('普通杀', '红桃', 10),
+             basic_card('普通杀', '红桃', 11),
+             basic_card('普通杀', '梅花', 2),
+             basic_card('普通杀', '梅花', 3),
+             basic_card('普通杀', '梅花', 4),
+             basic_card('普通杀', '梅花', 5),
+             basic_card('普通杀', '梅花', 6),
+             basic_card('普通杀', '梅花', 7),
+             basic_card('普通杀', '梅花', 8),
+             basic_card('普通杀', '梅花', 8),
+             basic_card('普通杀', '梅花', 9),
+             basic_card('普通杀', '梅花', 9),
+             basic_card('普通杀', '梅花', 10),
+             basic_card('普通杀', '梅花', 10),
+             basic_card('普通杀', '梅花', 11),
+             basic_card('普通杀', '梅花', 11),
+             basic_card('普通杀', '方块', 6),
+             basic_card('普通杀', '方块', 7),
+             basic_card('普通杀', '方块', 8),
+             basic_card('普通杀', '方块', 9),
+             basic_card('普通杀', '方块', 10),
+             basic_card('普通杀', '方块', 13),
+
+             basic_card('火杀', '红桃', 4),
+             basic_card('火杀', '红桃', 7),
+             basic_card('火杀', '红桃', 10),
+             basic_card('火杀', '方块', 4),
+             basic_card('火杀', '方块', 5),
+
+             basic_card('雷杀', '黑桃', 4),
+             basic_card('雷杀', '黑桃', 5),
+             basic_card('雷杀', '黑桃', 6),
+             basic_card('雷杀', '黑桃', 7),
+             basic_card('雷杀', '黑桃', 8),
+             basic_card('雷杀', '梅花', 5),
+             basic_card('雷杀', '梅花', 6),
+             basic_card('雷杀', '梅花', 7),
+             basic_card('雷杀', '梅花', 8),
+
+             basic_card('闪', '红桃', 2),
+             basic_card('闪', '红桃', 2),
+             basic_card('闪', '红桃', 8),
+             basic_card('闪', '红桃', 9),
+             basic_card('闪', '红桃', 11),
+             basic_card('闪', '红桃', 12),
+             basic_card('闪', '红桃', 13),
+             basic_card('闪', '方块', 2),
+             basic_card('闪', '方块', 2),
+             basic_card('闪', '方块', 3),
+             basic_card('闪', '方块', 4),
+             basic_card('闪', '方块', 5),
+             basic_card('闪', '方块', 6),
+             basic_card('闪', '方块', 6),
+             basic_card('闪', '方块', 7),
+             basic_card('闪', '方块', 7),
+             basic_card('闪', '方块', 8),
+             basic_card('闪', '方块', 8),
+             basic_card('闪', '方块', 9),
+             basic_card('闪', '方块', 10),
+             basic_card('闪', '方块', 10),
+             basic_card('闪', '方块', 11),
+             basic_card('闪', '方块', 11),
+             basic_card('闪', '方块', 11),
+
+             basic_card('桃', '红桃', 3),
+             basic_card('桃', '红桃', 4),
+             basic_card('桃', '红桃', 5),
+             basic_card('桃', '红桃', 6),
+             basic_card('桃', '红桃', 6),
+             basic_card('桃', '红桃', 7),
+             basic_card('桃', '红桃', 8),
+             basic_card('桃', '红桃', 9),
+             basic_card('桃', '红桃', 12),
+             basic_card('桃', '方块', 2),
+             basic_card('桃', '方块', 3),
+             basic_card('桃', '方块', 12),
+
+             basic_card('酒', '黑桃', 3, ),
+             basic_card('酒', '黑桃', 9, ),
+             basic_card('酒', '梅花', 3, ),
+             basic_card('酒', '梅花', 9, ),
+             basic_card('酒', '方块', 9, ),
+             weapon_card('诸葛连弩', '梅花', 1, 1),
+             weapon_card('诸葛连弩', '方块', 1, 1),
+             weapon_card('雌雄双股剑', '黑桃', 2, 2),
+             weapon_card('寒冰剑', '黑桃', 2, 2),
+             weapon_card('青釭剑', '黑桃', 2, 2),
+             weapon_card('古锭刀', '黑桃', 2, 2),
+             weapon_card('青龙偃月刀', '黑桃', 5, 3),
+             weapon_card('贯石斧', '方块', 5, 3),
+             weapon_card('丈八蛇矛', '黑桃', 12, 3),
+             weapon_card('方天画戟', '方块', 12, 4),
+             weapon_card('朱雀羽扇', '方块', 1, 4),
+             weapon_card('麒麟弓', '红桃', 5, 5),
+
+             armour_card('八卦阵', '黑桃', 2),
+             armour_card('八卦阵', '梅花', 2),
+             armour_card('白银狮子', '梅花', 1),
+             armour_card('仁王盾', '梅花', 2),
+             armour_card('藤甲', '黑桃', 2),
+             armour_card('藤甲', '梅花', 2),
+
+             attack_horse_card('大宛', '黑桃', 13),
+             attack_horse_card('赤兔', '红桃', 5),
+             attack_horse_card('紫骍', '黑桃', 13),
+
+             defense_horse_card('绝影', '黑桃', 5),
+             defense_horse_card('爪黄飞电', '红桃', 13),
+             defense_horse_card('的卢', '梅花', 5),
+             defense_horse_card('骅骝', '方块', 13),
+
+             treasure_card('木牛流马', '方块', 5),
+
+             common_jinnang_card('决斗', '黑桃', 1),
+             common_jinnang_card('决斗', '梅花', 1),
+             common_jinnang_card('决斗', '方块', 1),
+
+             common_jinnang_card('无中生有', '红桃', 7),
+             common_jinnang_card('无中生有', '红桃', 8),
+             common_jinnang_card('无中生有', '红桃', 9),
+             common_jinnang_card('无中生有', '红桃', 11),
+
+             common_jinnang_card('过河拆桥', '黑桃', 3),
+             common_jinnang_card('过河拆桥', '黑桃', 4),
+             common_jinnang_card('过河拆桥', '黑桃', 12),
+             common_jinnang_card('过河拆桥', '红桃', 12),
+             common_jinnang_card('过河拆桥', '梅花', 3),
+             common_jinnang_card('过河拆桥', '梅花', 4),
+
+             common_jinnang_card('顺手牵羊', '黑桃', 3),
+             common_jinnang_card('顺手牵羊', '黑桃', 4),
+             common_jinnang_card('顺手牵羊', '黑桃', 11),
+             common_jinnang_card('顺手牵羊', '方块', 3),
+             common_jinnang_card('顺手牵羊', '方块', 4),
+
+             common_jinnang_card('借刀杀人', '梅花', 12),
+             common_jinnang_card('借刀杀人', '梅花', 13),
+
+             common_jinnang_card('南蛮入侵', '黑桃', 7),
+             common_jinnang_card('南蛮入侵', '黑桃', 12),
+             common_jinnang_card('南蛮入侵', '梅花', 7),
+
+             common_jinnang_card('万箭齐发', '红桃', 1),
+
+             common_jinnang_card('桃园结义', '红桃', 1),
+
+             common_jinnang_card('五谷丰登', '红桃', 3),
+             common_jinnang_card('五谷丰登', '红桃', 4),
+
+             common_jinnang_card('无懈可击', '黑桃', 11),
+             common_jinnang_card('无懈可击', '黑桃', 13),
+             common_jinnang_card('无懈可击', '梅花', 12),
+             common_jinnang_card('无懈可击', '梅花', 13),
+             common_jinnang_card('无懈可击', '方块', 12),
+             common_jinnang_card('无懈可击', '红桃', 1),
+             common_jinnang_card('无懈可击', '红桃', 12),
+
+             common_jinnang_card('火攻', '红桃', 2),
+             common_jinnang_card('火攻', '红桃', 3),
+             common_jinnang_card('火攻', '方块', 12),
+
+             common_jinnang_card('铁索连环', '黑桃', 11),
+             common_jinnang_card('铁索连环', '黑桃', 12),
+             common_jinnang_card('铁索连环', '梅花', 10),
+             common_jinnang_card('铁索连环', '梅花', 11),
+             common_jinnang_card('铁索连环', '梅花', 12),
+             common_jinnang_card('铁索连环', '梅花', 13),
+
+             yanshi_jinnang_card('乐不思蜀', '黑桃', 6),
+             yanshi_jinnang_card('乐不思蜀', '红桃', 6),
+             yanshi_jinnang_card('乐不思蜀', '梅花', 6),
+
+             yanshi_jinnang_card('闪电', '黑桃', 1),
+             yanshi_jinnang_card('闪电', '红桃', 12),
 
 '''
