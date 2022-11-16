@@ -193,7 +193,7 @@ def Use_Card_process(card: Card.card,
     # 声明使用牌后
     # check_skill()
 
-    if '杀' in card.name:
+    if '杀' in card.name and type(card) == Card.basic_card:
         if player.use_sha_count == 1:
             print('不能再使用杀了')
             return
@@ -221,16 +221,22 @@ def Use_Card_process(card: Card.card,
                 if len(t.pandin_area) > 0:
                     if card.name in [k.name for k in t.pandin_area]:
                         legal_target.remove(t)
-        if card.name == '借刀杀人':
+        if '杀' in card.name and type(card) == Card.basic_card:
+            legal_target = [k for k, v in cal_dis(player, player_list).items() if v <= card.dis]
+        elif card.name == '借刀杀人':
             legal_target = []
             for p in player_list:  # 只有有武器的角色能成为合法目标
                 if p.equipment_area['武器'].name is not None and p is not player:
                     legal_target.append(p)
         elif card.name == '顺手牵羊':  # 过河拆桥和顺手牵羊的目标为区域里有牌的角色
+            legal_target = [k for k,v in cal_dis(player, player_list).items() if v <= card.dis ]
             for t in legal_target:
                 if isAreaEmpty(t):
                     legal_target.remove(t)
         elif card.name == '过河拆桥':
+            for t in legal_target:
+                if isAreaEmpty(t):
+                    legal_target.remove(t)
         if len(legal_target) > 0:  # 若合法目标列表为空,则结束使用流程
             print('你能选择的目标有:')
             for t in legal_target:
