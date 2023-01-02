@@ -1,13 +1,15 @@
+# Player.py
+
 # 玩家类
 import Card
-
+import Commander
 
 class player:
     def __init__(self, commander):
-        self.commander = commander
-        self.max_HP = commander.max_HP  # 体力上限
-        self.current_HP = commander.HP  # 当前体力值
-        self.max_HandCards = self.current_HP  # 手牌上限
+        self.commander = None  # 武将
+        self.max_HP = 0  # 体力上限
+        self.current_HP = 0  # 当前体力值
+        self.max_HandCards = 0  # 手牌上限
         self.idx = 0  # 座次
         self.identity = ''  # 身份信息
         self.equipment_area = {  # 装备区

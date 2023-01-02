@@ -1,7 +1,9 @@
+# init.py
+
 import Process
 import random
 import numpy as np
-from Commander import Commander
+from Commander import commander
 from Card import Get_Card_Heap, Identity_Card_Heap, Left_Card_Heap
 from Player import player
 
@@ -9,10 +11,8 @@ player_num = 2  # 游戏人数
 print('游戏开始')
 commanders = []
 player_list = []
-for i in range(player_num):
-    commander = Commander('WEI01', '曹操', 4, 4, '魏', [])
-    commanders.append(commander)
-    player_list.append(player(commander))
+commanders = [commander('WEI01', '曹操', 4, 4, '魏', []) for _ in range(player_num)]
+player_list = [player(c) for c in commanders]
 # 初始化
 get_card_heap = Get_Card_Heap()
 get_card_heap.init_card_heap()  # 初始化摸牌堆
