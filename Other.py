@@ -40,7 +40,7 @@ def cal_dis(player, player_list):  # 计算距离
     return res
 
 
-def print_player(player):  # 打印玩家信息
+def PrintPlayer(player):  # 打印玩家信息
     hengzhi_dic = {True: '是', False: '否'}
     print('{}号位'.format(player.idx))
     print('武将为:{}'.format(player.commander.name))

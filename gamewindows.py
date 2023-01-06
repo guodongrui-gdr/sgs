@@ -1,5 +1,5 @@
 import pygame
-import Card
+
 
 # 初始化 Pygame
 pygame.init()
@@ -107,7 +107,7 @@ while running:
             # 判断鼠标是否在按钮上
             if jieshu.rect.collidepoint(mouse_x, mouse_y):
                 # 如果在，则结束出牌阶段
-
+                pass
     # 绘制手牌
     for card in cards:
         screen.blit(card.image, (card.rect.x, card.rect.y))

@@ -2,7 +2,7 @@
 import Player
 
 
-class skill:
+class Skill:
     def __init__(self, name, player: Player.player, target: Player.player, label=None, consume=None):
         """
 
@@ -21,15 +21,15 @@ class skill:
 
 
 # 状态技
-class state_skill(skill):
+class StateSkill(Skill):
     def __init__(self, name, player, target, label=None, consume=None):
-        super(state_skill, self).__init__(name, player, target, label, consume)
+        super(StateSkill, self).__init__(name, player, target, label, consume)
 
 
 # 触发技
-class trigger_skill(skill):
+class TriggerSkill(Skill):
     def __init__(self, name, player, target, time, label=None, consume=None):
-        super(trigger_skill, self).__init__(name, player, target, label, consume)
+        super(TriggerSkill, self).__init__(name, player, target, label, consume)
         self.time = time
 
     def JianXiong(self, channel):

@@ -111,11 +111,12 @@ def Game_Process(player: player):
             while 1:
                 print('你当前体力值为:{}/{}'.format(player.current_HP, player.max_HP))
                 print('你的势力为:{}'.format(player.identity))
-                print('装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(player.equipment_area['武器'].name,
-                                                                         player.equipment_area['防具'].name,
-                                                                         player.equipment_area['进攻坐骑'].name,
-                                                                         player.equipment_area['防御坐骑'].name,
-                                                                         player.equipment_area['宝物'].name))
+                print('装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(
+                    player.equipment_area['武器'].name,
+                    player.equipment_area['防具'].name,
+                    player.equipment_area['进攻坐骑'].name,
+                    player.equipment_area['防御坐骑'].name,
+                    player.equipment_area['宝物'].name))
                 handcards = [[card.name, card.color, card.point] for card in player.HandCards_area]
                 print('你当前有的手牌为:{}'.format(handcards))
                 while 1:
@@ -148,10 +149,11 @@ def Game_Process(player: player):
                         break
                     print('当前场上所有角色信息为:')
                     for i in player_list:
-                        print_player(i)
+                        PrintPlayer(i)
         elif time == 'leftcard':
             while len(player.HandCards_area) > player.max_HandCards:
-                print('你当前有的手牌为:{}'.format([[card.name, card.color, card.point] for card in player.HandCards_area]))
+                print('你当前有的手牌为:{}'.format(
+                    [[card.name, card.color, card.point] for card in player.HandCards_area]))
                 need_left = len(player.HandCards_area) - player.max_HandCards
                 left_cards = eval(input('请弃置{}张牌'.format(need_left)))
                 if type(left_cards) == int:
@@ -231,7 +233,7 @@ def Use_Card_process(card: Card.card,
                 if p.equipment_area['武器'].name is not None and p is not player:
                     legal_target.append(p)
         elif card.name == '顺手牵羊':  # 过河拆桥和顺手牵羊的目标为区域里有牌的角色
-            legal_target = [k for k,v in cal_dis(player, player_list).items() if v <= card.dis ]
+            legal_target = [k for k, v in cal_dis(player, player_list).items() if v <= card.dis]
             for t in legal_target:
                 if isAreaEmpty(t):
                     legal_target.remove(t)
@@ -242,7 +244,7 @@ def Use_Card_process(card: Card.card,
         if len(legal_target) > 0:  # 若合法目标列表为空,则结束使用流程
             print('你能选择的目标有:')
             for t in legal_target:
-                print_player(t)
+                PrintPlayer(t)
             while 1:
                 target_idx = list(input('请选择目标:'))
                 for i in target_idx:
@@ -256,7 +258,7 @@ def Use_Card_process(card: Card.card,
                                           if v <= target[0].equipment_area['武器'].dis]
                 print('你能选择的目标有:')
                 for t in target_2:
-                    print_player(t)
+                    PrintPlayer(t)
                 while 1:
                     target_idx = input('请选择被杀目标:')
                     try:
@@ -290,7 +292,7 @@ def Use_Card_process(card: Card.card,
                 legal_target.append(p)
         print('你能选择的目标有:')
         for t in legal_target:
-            print_player(t)
+            PrintPlayer(t)
         while 1:
             target_idx = list(input('请选择目标:'))
             for i in target_idx:
@@ -302,7 +304,7 @@ def Use_Card_process(card: Card.card,
     elif card.name == '铁索连环':
         print('你能选择的目标有:')
         for t in player_list:
-            print_player(t)
+            PrintPlayer(t)
         while 1:
             player_input = input('请选择1至2个目标:').split(',')
             for i in player_input:
@@ -392,6 +394,7 @@ def Use_Clear_Process(player: player,
     card: 被使用的牌
     target: 目标列表
     b_target: 借刀杀人指定的被杀目标
+
     """
     global wuxie_count
 
@@ -409,8 +412,8 @@ def Use_Clear_Process(player: player,
                 if '无懈可击' not in [w.name for w in j.HandCards_area]:
                     continue
                 print('{}号位手牌为{}'.format(j.idx,
-                                         [[card.name, card.color, card.point] for card in
-                                          j.HandCards_area]))
+                                              [[card.name, card.color, card.point] for card in
+                                               j.HandCards_area]))
                 wuxie = eval(input('{}号位是否使用无懈可击, 0表示不使用无懈可击, i表示使用第i张牌'.format(j.idx)))
                 if not wuxie:
                     continue
@@ -427,10 +430,11 @@ def Use_Clear_Process(player: player,
             else:
                 for k in range(card.need_shan):
                     print('{}号位手牌为{}'.format(target[i].idx,
-                                             [[card.name, card.color, card.point] for card in
-                                              target[i].HandCards_area]))
+                                                  [[card.name, card.color, card.point] for card in
+                                                   target[i].HandCards_area]))
 
-                    player_input = eval(input('{}号位是否使用闪, 0表示不使用闪, i表示使用第i张牌'.format(target[i].idx)))
+                    player_input = eval(
+                        input('{}号位是否使用闪, 0表示不使用闪, i表示使用第i张牌'.format(target[i].idx)))
                     if not player_input:
                         break
                     shan_idx = target[i].HandCards_area[player_input - 1]
@@ -467,11 +471,12 @@ def Use_Clear_Process(player: player,
             target[i].hengzhi = not target[i].hengzhi
         elif card.name == '火攻':
             print('{}号位手牌为{}'.format(target[i].idx,
-                                     [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
-            show_card: Card.card = target[i].HandCards_area[eval(input('{}号位请展示一张手牌'.format(target[i].idx))) - 1]
+                                          [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
+            show_card: Card.card = target[i].HandCards_area[
+                eval(input('{}号位请展示一张手牌'.format(target[i].idx))) - 1]
             print(show_card.name, show_card.color, show_card.point)
             print('{}号位手牌为{}'.format(target[i].idx,
-                                     [[card.name, card.color, card.point] for card in player.HandCards_area]))
+                                          [[card.name, card.color, card.point] for card in player.HandCards_area]))
             left_card: int = eval(input('{}号位可以弃置一张与之花色相同的牌,对其造成1点火焰伤害:'.format(player.idx)))
             if not left_card:
                 continue
@@ -491,7 +496,8 @@ def Use_Clear_Process(player: player,
                 Damage_Process(player, card, player, target[i], 1, False)
             else:
                 print('{}号位手牌为{}'.format(target[i].idx,
-                                         [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
+                                              [[card.name, card.color, card.point] for card in
+                                               target[i].HandCards_area]))
                 player_input = eval(input('{}号位是否打出杀, 0表示不出杀, i表示出第i张牌'.format(target[i].idx)))
                 sha_idx = target[i].HandCards_area[player_input - 1]
                 if '杀' in sha_idx.name:
@@ -501,7 +507,8 @@ def Use_Clear_Process(player: player,
                 Damage_Process(player, card, player, target[i], 1, False)
             else:
                 print('{}号位手牌为{}'.format(target[i].idx,
-                                         [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
+                                              [[card.name, card.color, card.point] for card in
+                                               target[i].HandCards_area]))
                 player_input = eval(input('{}号位是否打出闪, 0表示不出闪, i表示出第i张牌'.format(target[i].idx)))
                 shan_idx = target[i].HandCards_area[player_input - 1]
                 if shan_idx.name == '闪':
@@ -510,11 +517,12 @@ def Use_Clear_Process(player: player,
             left_card: Card.card = Card.card(None, None, None)
             while 1:
                 print('目标有{}张手牌'.format(len(target[i].HandCards_area)))
-                print('目标装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(target[i].equipment_area['武器'].name,
-                                                                           target[i].equipment_area['防具'].name,
-                                                                           target[i].equipment_area['进攻坐骑'].name,
-                                                                           target[i].equipment_area['防御坐骑'].name,
-                                                                           target[i].equipment_area['宝物'].name))
+                print('目标装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(
+                    target[i].equipment_area['武器'].name,
+                    target[i].equipment_area['防具'].name,
+                    target[i].equipment_area['进攻坐骑'].name,
+                    target[i].equipment_area['防御坐骑'].name,
+                    target[i].equipment_area['宝物'].name))
                 print('目标判定区有:{}'.format([card.name for card in target[i].pandin_area]))
                 player_input = input('请选择一张牌弃置(i表示弃置第i张手牌,w表示弃置武器牌,a表示弃置防具牌,'
                                      'j表示弃置进攻坐骑,f表示弃置防御坐骑,t表示弃置宝物牌,l表示弃置乐不思蜀,'
@@ -545,12 +553,14 @@ def Use_Clear_Process(player: player,
                     elif player_input == 'b' and '兵粮寸断' in [card.name for card in target[i].pandin_area]:
                         left_card_heap.card_list.append(
                             [card for card in target[i].pandin_area if card.name == '兵粮寸断'][0])
-                        target[i].pandin_area.remove([card for card in target[i].pandin_area if card.name == '兵粮寸断'][0])
+                        target[i].pandin_area.remove(
+                            [card for card in target[i].pandin_area if card.name == '兵粮寸断'][0])
                         break
                     elif player_input == 'l' and '乐不思蜀' in [card.name for card in target[i].pandin_area]:
                         left_card_heap.card_list.append(
                             [card for card in target[i].pandin_area if card.name == '乐不思蜀'][0])
-                        target[i].pandin_area.remove([card for card in target[i].pandin_area if card.name == '乐不思蜀'][0])
+                        target[i].pandin_area.remove(
+                            [card for card in target[i].pandin_area if card.name == '乐不思蜀'][0])
                         break
                     elif player_input == 's' and '闪电' in [card.name for card in target[i].pandin_area]:
                         left_card_heap.card_list.append(
@@ -571,11 +581,12 @@ def Use_Clear_Process(player: player,
             get_card: Card.card = Card.card(None, None, None)
             while 1:
                 print('目标有{}张手牌'.format(len(target[i].HandCards_area)))
-                print('目标装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(target[i].equipment_area['武器'].name,
-                                                                           target[i].equipment_area['防具'].name,
-                                                                           target[i].equipment_area['进攻坐骑'].name,
-                                                                           target[i].equipment_area['防御坐骑'].name,
-                                                                           target[i].equipment_area['宝物'].name))
+                print('目标装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(
+                    target[i].equipment_area['武器'].name,
+                    target[i].equipment_area['防具'].name,
+                    target[i].equipment_area['进攻坐骑'].name,
+                    target[i].equipment_area['防御坐骑'].name,
+                    target[i].equipment_area['宝物'].name))
                 print('目标判定区有:{}'.format([card.name for card in target[i].pandin_area]))
                 player_input = input('请选择一张牌获得(i表示获得第i张手牌,w表示获得武器牌,a表示获得防具牌,'
                                      'j表示获得进攻坐骑,f表示获得防御坐骑,t表示获得宝物牌,l表示获得乐不思蜀,'
@@ -604,12 +615,16 @@ def Use_Clear_Process(player: player,
                         target[i].equipment_area['宝物'] = Card.treasure_card(None, None, None)
                         break
                     elif player_input == 'b' and '兵粮寸断' in [card.name for card in target[i].pandin_area]:
-                        player.HandCards_area.append([card for card in target[i].pandin_area if card.name == '兵粮寸断'][0])
-                        target[i].pandin_area.remove([card for card in target[i].pandin_area if card.name == '兵粮寸断'][0])
+                        player.HandCards_area.append(
+                            [card for card in target[i].pandin_area if card.name == '兵粮寸断'][0])
+                        target[i].pandin_area.remove(
+                            [card for card in target[i].pandin_area if card.name == '兵粮寸断'][0])
                         break
                     elif player_input == 'l' and '乐不思蜀' in [card.name for card in target[i].pandin_area]:
-                        player.HandCards_area.append([card for card in target[i].pandin_area if card.name == '乐不思蜀'][0])
-                        target[i].pandin_area.remove([card for card in target[i].pandin_area if card.name == '乐不思蜀'][0])
+                        player.HandCards_area.append(
+                            [card for card in target[i].pandin_area if card.name == '乐不思蜀'][0])
+                        target[i].pandin_area.remove(
+                            [card for card in target[i].pandin_area if card.name == '乐不思蜀'][0])
                         break
                     elif player_input == 's' and '闪电' in [card.name for card in target[i].pandin_area]:
                         player.HandCards_area.append([card for card in target[i].pandin_area if card.name == '闪电'][0])
@@ -632,7 +647,8 @@ def Use_Clear_Process(player: player,
                 target[i].equipment_area['武器'] = Card.weapon_card(None, None, None, None)
             else:
                 print('{}号位手牌为{}'.format(target[i].idx,
-                                         [[card.name, card.color, card.point] for card in target[i].HandCards_area]))
+                                              [[card.name, card.color, card.point] for card in
+                                               target[i].HandCards_area]))
                 player_input = eval(input('{}号位是否打出杀, 0表示不出杀, i表示出第i张牌'.format(target[i].idx)))
                 sha_idx = target[i].HandCards_area[player_input - 1]
                 if '杀' in sha_idx.name:
@@ -654,7 +670,8 @@ def Use_Clear_Process(player: player,
 
                 else:
                     print('{}号位手牌为{}'.format(new_list[j].idx,
-                                             [[card.name, card.color, card.point] for card in new_list[j].HandCards_area]))
+                                                  [[card.name, card.color, card.point] for card in
+                                                   new_list[j].HandCards_area]))
                 player_input = eval(input('{}号位是否打出杀, 0表示不出杀, i表示出第i张牌'.format(new_list[j].idx)))
                 sha_idx = new_list[j].HandCards_area[player_input - 1]
                 if '杀' in sha_idx.name:
@@ -731,11 +748,12 @@ def binsi(binsi_player: player, current_player: player):
                 print('{}濒死,需要{}颗桃'.format(binsi_player.commander.name, 1 - binsi_player.current_HP))
                 if current_player_tmp == binsi_player:
                     print('{}号位手牌为:{}'.format(binsi_player.idx, [[card.name, card.color, card.point] for card in
-                                                                 binsi_player.HandCards_area]))
+                                                                      binsi_player.HandCards_area]))
                     print('{}号位是否使用桃或酒(0表示不使用,i表示使用第i张牌):'.format(binsi_player.idx))
                 else:
-                    print('{}号位手牌为:{}'.format(current_player_tmp.idx, [[card.name, card.color, card.point] for card in
-                                                                       current_player_tmp.HandCards_area]))
+                    print('{}号位手牌为:{}'.format(current_player_tmp.idx,
+                                                   [[card.name, card.color, card.point] for card in
+                                                    current_player_tmp.HandCards_area]))
                     print('{}号位是否使用桃(0表示不使用,i表示使用第i张牌):'.format(current_player_tmp.idx))
                 tao = eval(input())
                 if tao > 0:
@@ -769,4 +787,3 @@ def death_process(dead_player: player):
     # 死亡时
     # check_skill('when_dead')
     player_list = player_list_tmp
-
