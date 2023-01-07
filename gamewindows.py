@@ -45,7 +45,7 @@ class draw_Card:
 
 
 # 加载背景图
-background_image = pygame.image.load("背景.jpg")
+background_image = pygame.image.load(r"素材\背景.jpg")
 background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
 # 绘制背景图
 screen.blit(background_image, (0, 0))
@@ -53,7 +53,7 @@ screen.blit(background_image, (0, 0))
 # 加载手牌图像
 card_images = []
 for i in range(2):
-    card_image = f"{i}.jpg"
+    card_image = fr"素材\{i}.jpg"
     card_images.append(card_image)
 
 # 设置手牌的大小和间距
@@ -83,8 +83,8 @@ jieshu_x, jieshu_y = 1190, 670
 queding_width, queding_height = 370, 100
 jieshu_width, jieshu_height = 220, 80
 
-queding = Button('确定.png', queding_x, queding_y, queding_width, queding_height, active_image='确定2.png')
-jieshu = Button('结束.jpg', jieshu_x, jieshu_y, jieshu_width, jieshu_height)
+queding = Button(r'素材\确定.png', queding_x, queding_y, queding_width, queding_height, active_image=r'素材\确定2.png')
+jieshu = Button(r'素材\结束.jpg', jieshu_x, jieshu_y, jieshu_width, jieshu_height)
 
 buttons.append(queding)
 buttons.append(jieshu)

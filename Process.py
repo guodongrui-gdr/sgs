@@ -6,7 +6,7 @@ from typing import List
 import Card
 import Player
 from Other import *
-from init import player_list, get_card_heap, left_card_heap, tmp_card
+import items
 
 # 游戏流程
 game_process = ['bef_huihe_start',  # 回合开始前
@@ -66,7 +66,7 @@ binsi_process = ['when_into_binsi',  # 进入濒死状态时
 wuxie_count = 0
 
 
-def Game_Process(player: player):
+def Game_Process(player: player,Items: items.Items):
     """
 
     player: 当前回合角色

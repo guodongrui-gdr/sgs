@@ -6,7 +6,7 @@ import Commander
 
 class player:
     def __init__(self, commander):
-        self.commander = None  # 武将
+        self.commander = commander  # 武将
         self.max_HP = 0  # 体力上限
         self.current_HP = 0  # 当前体力值
         self.max_HandCards = 0  # 手牌上限
