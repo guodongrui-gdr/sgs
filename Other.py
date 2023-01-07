@@ -1,6 +1,16 @@
-from Player import player
 import numpy as np
 
+from Player import player
+
+
+def check_skill(time, current_player, target_player, Items):
+    skills = []
+    if time == 'af_hurt':
+        for skill in [player.skills for player in Items.PlayerList]:
+            if skill[0].name == '奸雄' and skill[0] in target_player.skills:
+                skill[0].target = target_player
+                skills.append(skill[0])
+    return skills
 
 def isAreaEmpty(player: player) -> bool:  # 判断玩家区域内是否有牌
     return len(player.HandCards_area) == 0 and len(player.pandin_area) == 0 and np.array(
@@ -44,6 +54,7 @@ def PrintPlayer(player):  # 打印玩家信息
     hengzhi_dic = {True: '是', False: '否'}
     print('{}号位'.format(player.idx))
     print('武将为:{}'.format(player.commander.name))
+    print('技能为:{}'.format([skill.name for skill in player.skills]))
     print('当前体力值为:{}/{}'.format(player.current_HP, player.max_HP))
     print('是否被横置:{}'.format(hengzhi_dic[player.hengzhi]))
     print('装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(player.equipment_area['武器'].name,

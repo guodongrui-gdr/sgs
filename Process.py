@@ -66,21 +66,37 @@ binsi_process = ['when_into_binsi',  # 进入濒死状态时
 wuxie_count = 0
 
 
-def Game_Process(player: player,Items: items.Items):
+def Game_Process(player: player, Items: items.Items):
     """
 
     player: 当前回合角色
 
     """
+    global wuxie_count
     game_process_tmp = game_process.copy()
     isEnd = 0
     for time in game_process_tmp:
         # check_skill(time) 检查是否有武将技能发动
         if time == 'pandin':
             while len(player.pandin_area) > 0:
-                pandin_name = player.pandin_area[-1].name
+                card = player.pandin_area[-1]
+                pandin_name = card.name
                 print('即将判定{}'.format(pandin_name))
-                # ask_wuxiekeji()
+                for j in Items.PlayerList:
+                    if '无懈可击' not in [w.name for w in j.HandCards_area]:
+                        continue
+                    print('{}号位手牌为{}'.format(j.idx,
+                                                  [[card.name, card.color, card.point] for card in
+                                                   j.HandCards_area]))
+                    wuxie = eval(input('{}号位是否使用无懈可击, 0表示不使用无懈可击, i表示使用第i张牌'.format(j.idx)))
+                    if not wuxie:
+                        continue
+                    wuxie = j.HandCards_area[wuxie - 1]
+                    if wuxie.name == '无懈可击':
+                        wuxie.target = card
+                        wuxie_count += Use_Card_process(wuxie, j, Items)
+                        if wuxie_count:
+                            return 0
                 result = Pandin_Process(player, Items)
                 if pandin_name == '兵粮寸断':
                     if result[0] != '梅花':
@@ -98,7 +114,7 @@ def Game_Process(player: player,Items: items.Items):
                     del player.pandin_area[-1]
                 elif pandin_name == '闪电':
                     if (result[0] == '黑桃') & (result[1] >= 2) & (result[1] <= 9):
-                        Damage_Process(None, player.pandin_area[-1], player, player, 3, True)
+                        Damage_Process(None, player.pandin_area[-1], player, player, 3, True, Items)
                     else:
                         player.next.pandin_area.append(player.pandin_area[-1])
                         del player.pandin_area[-1]
@@ -111,6 +127,7 @@ def Game_Process(player: player,Items: items.Items):
             while 1:
                 print('你当前体力值为:{}/{}'.format(player.current_HP, player.max_HP))
                 print('你的势力为:{}'.format(player.identity))
+                print('你的技能为：{}'.format([skill.name for skill in player.skills]))
                 print('装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(
                     player.equipment_area['武器'].name,
                     player.equipment_area['防具'].name,
@@ -145,10 +162,10 @@ def Game_Process(player: player,Items: items.Items):
                                 player.HandCards_area.remove(card)
                                 player.HandCards_area.append(Items.GetCardHeap.get_card(1, Items.LeftCardHeap)[0])
                                 break
-                        Use_Card_process(card, player)
+                        Use_Card_process(card, player, Items)
                         break
                     print('当前场上所有角色信息为:')
-                    for i in player_list:
+                    for i in Items.PlayerList:
                         PrintPlayer(i)
         elif time == 'leftcard':
             while len(player.HandCards_area) > player.max_HandCards:
@@ -174,6 +191,7 @@ def Pandin_Process(player, Items):
     return: 判定结果
 
     """
+    res = []
     for time in pandin_process:
         # check_skill(time) 检查是否有武将技能发动
         if time == 'when_pandin':
@@ -221,21 +239,21 @@ def Use_Card_process(card: Card.card,
     if isinstance(card.target, Player.player) or isinstance(card.target, Card.card):
         target.append(card.target)
     elif 'another player' in card.target:
-        legal_target: List[player] = [p for p in player_list if p != player]
+        legal_target: List[player] = [p for p in Items.PlayerList if p != player]
         if type(card) == Card.yanshi_jinnang_card:  # 若目标判定区内有同名牌,则不能成为合法目标
             for t in legal_target:
                 if len(t.pandin_area) > 0:
                     if card.name in [k.name for k in t.pandin_area]:
                         legal_target.remove(t)
         if '杀' in card.name and type(card) == Card.basic_card:
-            legal_target = [k for k, v in cal_dis(player, player_list).items() if v <= card.dis]
+            legal_target = [k for k, v in cal_dis(player, Items.PlayerList).items() if v <= card.dis]
         elif card.name == '借刀杀人':
             legal_target = []
-            for p in player_list:  # 只有有武器的角色能成为合法目标
+            for p in Items.PlayerList:  # 只有有武器的角色能成为合法目标
                 if p.equipment_area['武器'].name is not None and p is not player:
                     legal_target.append(p)
         elif card.name == '顺手牵羊':  # 过河拆桥和顺手牵羊的目标为区域里有牌的角色
-            legal_target = [k for k, v in cal_dis(player, player_list).items() if v <= card.dis]
+            legal_target = [k for k, v in cal_dis(player, Items.PlayerList).items() if v <= card.dis]
             for t in legal_target:
                 if isAreaEmpty(t):
                     legal_target.remove(t)
@@ -256,7 +274,8 @@ def Use_Card_process(card: Card.card,
                 if len(target) > 0:
                     break
             if card.name == '借刀杀人':
-                target_2: List[player] = [k for k, v in cal_dis(target[0], player_list).items()  # 被杀目标必须在借刀杀人的目标的攻击距离之内
+                target_2: List[player] = [k for k, v in cal_dis(target[0], Items.PlayerList).items()
+                                          # 被杀目标必须在借刀杀人的目标的攻击距离之内
                                           if v <= target[0].equipment_area['武器'].dis]
                 print('你能选择的目标有:')
                 for t in target_2:
@@ -272,14 +291,14 @@ def Use_Card_process(card: Card.card,
                         break
         else:
             return
-    elif (np.array([player.current_HP for player in player_list]).any() <= 0) and ('binsi_player' in card.target):
-        binsi_player = [player for player in player_list if player.current_HP <= 0]
+    elif (np.array([player.current_HP for player in Items.PlayerList]).any() <= 0) and ('binsi_player' in card.target):
+        binsi_player = [player for player in Items.PlayerList if player.current_HP <= 0]
         target = binsi_player
     elif 'player' in card.target:
         target = [player]
     elif 'all players' in card.target:
         tmp = player
-        for i in range(len(player_list)):
+        for i in range(len(Items.PlayerList)):
             target.append(tmp)
             tmp = tmp.next
     elif 'all other players' in card.target:
@@ -289,7 +308,7 @@ def Use_Card_process(card: Card.card,
             tmp = tmp.next
     elif card.name == '火攻':  # 火攻的目标是一名有手牌的角色
         legal_target = []
-        for p in player_list:
+        for p in Items.PlayerList:
             if len(p.HandCards_area) > 0:
                 legal_target.append(p)
         print('你能选择的目标有:')
@@ -305,12 +324,12 @@ def Use_Card_process(card: Card.card,
                 break
     elif card.name == '铁索连环':
         print('你能选择的目标有:')
-        for t in player_list:
+        for t in Items.PlayerList:
             PrintPlayer(t)
         while 1:
             player_input = input('请选择1至2个目标:').split(',')
             for i in player_input:
-                for p in player_list:
+                for p in Items.PlayerList:
                     if p.idx == int(i):
                         target.append(p)
             if len(target) > 0:
@@ -328,7 +347,7 @@ def Use_Card_process(card: Card.card,
             player.current_HP += 1
             player.max_HandCards += 1
     player.HandCards_area.remove(card)
-
+    Items.TmpCard.append(card)
     # 指定目标时
     # for t in target:
     # checkskill
@@ -347,12 +366,13 @@ def Use_Card_process(card: Card.card,
 
     # 使用结算准备结算结束时
     if card.name == '五谷丰登':
-        for i in range(len(player_list)):
+        for i in range(len(Items.PlayerList)):
             Items.TmpCard.append(Items.GetCardHeap.get_card(1, Items.LeftCardHeap)[0])
         print([[card.name, card.color, card.point] for card in Items.TmpCard])
-        Use_Clear_Process(player, card, target)
+        Use_Clear_Process(player, card, target, Items)
         return
     if type(card) == Card.yanshi_jinnang_card:
+        Items.TmpCard.remove(0)
         target[0].pandin_area.append(card)
         return
     if type(card) is Card.weapon_card:
@@ -382,7 +402,7 @@ def Use_Card_process(card: Card.card,
         card.player = player
     if len(target_2) > 0:
         return Use_Clear_Process(player, card, target, target_2[0])
-    return Use_Clear_Process(player, card, target)
+    return Use_Clear_Process(player, card, target, Items)
 
 
 # 使用生效的流程
@@ -412,19 +432,17 @@ def Use_Clear_Process(player: player,
             continue
         # 生效前
         if type(card) == Card.common_jinnang_card:
-            for j in player_list:
+            for j in Items.PlayerList:
                 if '无懈可击' not in [w.name for w in j.HandCards_area]:
                     continue
-                print('{}号位手牌为{}'.format(j.idx,
-                                              [[card.name, card.color, card.point] for card in
-                                               j.HandCards_area]))
+                print('{}号位手牌为{}'.format(j.idx, [[card.name, card.color, card.point] for card in j.HandCards_area]))
                 wuxie = eval(input('{}号位是否使用无懈可击, 0表示不使用无懈可击, i表示使用第i张牌'.format(j.idx)))
                 if not wuxie:
                     continue
                 wuxie = j.HandCards_area[wuxie - 1]
                 if wuxie.name == '无懈可击':
                     wuxie.target = card
-                    wuxie_count += Use_Card_process(wuxie, j)
+                    wuxie_count += Use_Card_process(wuxie, j, Items)
                     if wuxie_count:
                         return 0
         if '杀' in card.name and type(card) == Card.basic_card:
@@ -445,7 +463,7 @@ def Use_Clear_Process(player: player,
 
                     if shan_idx.name == '闪':
                         shan_idx.target = card
-                        Use_Card_process(shan_idx, target[i])
+                        Use_Card_process(shan_idx, target[i], Items)
                         shan += 1
                 if shan == card.need_shan:
                     # 被抵消后
@@ -455,7 +473,7 @@ def Use_Clear_Process(player: player,
 
         # 生效后
         if '杀' in card.name and type(card) == Card.basic_card:
-            Damage_Process(player, card, player, target[i], 1 + player.jiu, card.is_shuxing)
+            Damage_Process(player, card, player, target[i], 1 + player.jiu, card.is_shuxing, Items)
         elif card.name == '闪':
             return 1
         elif card.name == '桃':
@@ -467,7 +485,7 @@ def Use_Clear_Process(player: player,
             for get_card in Items.GetCardHeap.get_card(2, Items.LeftCardHeap):
                 player.HandCards_area.append(get_card)
         elif card.name == '五谷丰登':
-            idx = eval(input('{}号位请选择获得一张牌:'.format(target[i].idx))) - 1
+            idx = eval(input('{}号位请选择获得一张牌:'.format(target[i].idx)))
             target[i].HandCards_area.append(Items.TmpCard[idx])
             del Items.TmpCard[idx]
             print([[card.name, card.color, card.point] for card in Items.TmpCard])
@@ -488,7 +506,7 @@ def Use_Clear_Process(player: player,
             if show_card.color == left_card.color:
                 Items.LeftCardHeap.card_list.append(left_card)
                 player.HandCards_area.remove(left_card)
-                Damage_Process(player, card, player, target[i], 1, True)
+                Damage_Process(player, card, player, target[i], 1, True, Items)
         elif card.name == '桃园结义':
             target[i].current_HP += 1
             target[i].max_HandCards += 1
@@ -497,7 +515,7 @@ def Use_Clear_Process(player: player,
             for card_name in [c.name for c in target[i].HandCards_area]:
                 k += card_name.find('杀')
             if k == -len(target[i].HandCards_area):
-                Damage_Process(player, card, player, target[i], 1, False)
+                Damage_Process(player, card, player, target[i], 1, False, Items)
             else:
                 print('{}号位手牌为{}'.format(target[i].idx,
                                               [[card.name, card.color, card.point] for card in
@@ -508,7 +526,7 @@ def Use_Clear_Process(player: player,
                     continue
         elif card.name == '万箭齐发':
             if '闪' not in [c.name for c in target[i].HandCards_area]:
-                Damage_Process(player, card, player, target[i], 1, False)
+                Damage_Process(player, card, player, target[i], 1, False, Items)
             else:
                 print('{}号位手牌为{}'.format(target[i].idx,
                                               [[card.name, card.color, card.point] for card in
@@ -657,7 +675,7 @@ def Use_Clear_Process(player: player,
                 sha_idx = target[i].HandCards_area[player_input - 1]
                 if '杀' in sha_idx.name:
                     sha_idx.target = b_target
-                    Use_Card_process(sha_idx, target[i])
+                    Use_Card_process(sha_idx, target[i], Items)
                     continue
         elif card.name == '决斗':
             new_list: List[Player.player] = [target[i], player]
@@ -668,9 +686,9 @@ def Use_Clear_Process(player: player,
                     k += card_name.find('杀')
                 if k == -len(new_list[j].HandCards_area):
                     if j:
-                        Damage_Process(new_list[0], card, player, new_list[1], 1, False)
+                        Damage_Process(new_list[0], card, player, new_list[1], 1, False, Items)
                     else:
-                        Damage_Process(new_list[1], card, player, new_list[0], 1, False)
+                        Damage_Process(new_list[1], card, player, new_list[0], 1, False, Items)
 
                 else:
                     print('{}号位手牌为{}'.format(new_list[j].idx,
@@ -683,7 +701,7 @@ def Use_Clear_Process(player: player,
                     if j == 2:
                         j = 0
                     continue
-                
+
     if len(Items.TmpCard) > 0:
         for i in Items.TmpCard:
             Items.LeftCardHeap.card_list.append(i)
@@ -698,39 +716,45 @@ def Damage_Process(source,
                    hurt_player: player,
                    damage_num: int,
                    is_shuxing: bool,
+                   Items: items.Items,
                    is_lianhuan=False):
     """
 
     source: 来源
     channel: 渠道
     current_player: 当前回合角色
-    hurted_player: 受到伤害的角色
+    hurt_player: 受到伤害的角色
     damage_num: 伤害值
     is_shuxing: 是否为属性伤害
+    Items: 场上状态
     is_lianhuan: 是否为连环伤害
 
     """
 
     for time in damage_process:
-        # check_skill(time)
+        TriggerableSkill = check_skill(time, current_player, hurt_player, Items)
+        if TriggerableSkill:
+            for skill in TriggerableSkill:
+                skill.trigger(Items)
         if time == 'when_hurt':
             if hurt_player.hengzhi and is_shuxing:  # 若受伤角色处于横置状态且受到的伤害为属性伤害,则其重置
                 hurt_player.hengzhi = False
-            Deducted_HP_Process(hurt_player, current_player, damage_num)
+            Deducted_HP_Process(hurt_player, current_player, damage_num, Items)
 
     # 之后若受伤角色受到的是不为连环伤害的属性伤害且有其他角色处于横置状态,则触发铁索连环
     if not is_lianhuan and is_shuxing:
         player_tmp = current_player
         count = 1
-        while count != len(player_list):
+        while count != len(Items.PlayerList):
             if player_tmp.hengzhi:
-                Damage_Process(source, channel, current_player, player_tmp, damage_num, is_shuxing, is_lianhuan=True)
+                Damage_Process(source, channel, current_player, player_tmp, damage_num, is_shuxing, Items,
+                               is_lianhuan=True)
             player_tmp = player_tmp.next
             count += 1
 
 
 # 扣减体力流程(造成伤害事件)
-def Deducted_HP_Process(hurt_player: player, current_player, damage_num):
+def Deducted_HP_Process(hurt_player: player, current_player, damage_num, Items):
     for time in deducted_HP_process:
         # check_skill(time)
         if time == 'when_deducted_HP':
@@ -738,17 +762,17 @@ def Deducted_HP_Process(hurt_player: player, current_player, damage_num):
             hurt_player.max_HandCards = hurt_player.current_HP
         if time == 'af_deducted_HP':
             if hurt_player.current_HP <= 0:
-                binsi(hurt_player, current_player)
+                binsi(hurt_player, current_player, Items)
 
 
 # 濒死流程
-def binsi(binsi_player: player, current_player: player):
+def binsi(binsi_player: player, current_player: player, Items):
     for time in binsi_process:
         # check_skill
         if time == 'when_binsi':
             current_player_tmp = current_player
             count = 0
-            while (binsi_player.current_HP <= 0) and (count < len(player_list)):
+            while (binsi_player.current_HP <= 0) and (count < len(Items.PlayerList)):
                 print('{}濒死,需要{}颗桃'.format(binsi_player.commander.name, 1 - binsi_player.current_HP))
                 if current_player_tmp == binsi_player:
                     print('{}号位手牌为:{}'.format(binsi_player.idx, [[card.name, card.color, card.point] for card in
@@ -761,23 +785,22 @@ def binsi(binsi_player: player, current_player: player):
                     print('{}号位是否使用桃(0表示不使用,i表示使用第i张牌):'.format(current_player_tmp.idx))
                 tao = eval(input())
                 if tao > 0:
-                    Use_Card_process(current_player_tmp.HandCards_area[tao - 1], current_player_tmp)
+                    Use_Card_process(current_player_tmp.HandCards_area[tao - 1], current_player_tmp, Items)
                 count += 1
                 current_player_tmp = current_player_tmp.next
             if binsi_player.current_HP <= 0:
-                death_process(binsi_player)
+                death_process(binsi_player, Items)
 
 
 # 死亡流程
-def death_process(dead_player: player):
+def death_process(dead_player: player, Items):
     # 确认身份前
-    global player_list
     print('死亡角色身份为:{}'.format(dead_player.identity))
-    player_list_tmp = player_list
+    Items.PlayerList_tmp = Items.PlayerList
     dead_player.pre.next = dead_player.next
     dead_player.next.pre = dead_player.pre
-    del player_list[player_list.index(dead_player)]
-    vic = check_vic(dead_player, player_list)
+    del Items.PlayerList[Items.PlayerList.index(dead_player)]
+    vic = check_vic(dead_player, Items.PlayerList)
     if vic != 0:
         if vic == 1:
             print('主公阵营获胜\n游戏结束')
@@ -790,4 +813,4 @@ def death_process(dead_player: player):
             exit(0)
     # 死亡时
     # check_skill('when_dead')
-    player_list = player_list_tmp
+    Items.PlayerList = Items.PlayerList_tmp

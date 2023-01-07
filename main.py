@@ -2,19 +2,15 @@
 
 import random
 
-from Process import *
+import Commander
 from Card import Get_Card_Heap, Identity_Card_Heap, Left_Card_Heap
-from Commander import commander
-import Player
-import items
-
+from Process import *
 
 if __name__ == '__main__':
     player_num = 2  # 游戏人数
     print('游戏开始')
     Items = items.Items()
-    commanders = []
-    commanders = [commander('WEI01', '曹操', 4, 4, '魏', []) for _ in range(player_num)]
+    commanders = [Commander.Caocao for _ in range(player_num)]
     Items.PlayerList = [Player.player(c) for c in commanders]
     # 初始化
     Items.GetCardHeap = Get_Card_Heap()
@@ -59,8 +55,6 @@ if __name__ == '__main__':
             Items.PlayerList[i].pre = Items.PlayerList[i - 1]
     del player_list_cache, player_list_copy
 
-    # 分发起始手牌
-    # check_skill()
     for player in Items.PlayerList:
         for start_card in Items.GetCardHeap.get_card(4, Items.LeftCardHeap):
             player.HandCards_area.append(start_card)

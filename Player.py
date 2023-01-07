@@ -2,14 +2,15 @@
 
 # 玩家类
 import Card
-import Commander
+
 
 class player:
     def __init__(self, commander):
         self.commander = commander  # 武将
-        self.max_HP = 0  # 体力上限
-        self.current_HP = 0  # 当前体力值
-        self.max_HandCards = 0  # 手牌上限
+        self.skills = commander.skills
+        self.max_HP = commander.max_HP  # 体力上限
+        self.current_HP = commander.HP  # 当前体力值
+        self.max_HandCards = self.current_HP  # 手牌上限
         self.idx = 0  # 座次
         self.identity = ''  # 身份信息
         self.equipment_area = {  # 装备区
@@ -21,8 +22,8 @@ class player:
         }
         self.HandCards_area = []  # 手牌区
         self.pandin_area = []  # 判定区
-        self.pre: player = None  # 上家
-        self.next: player = None  # 下家
+        self.pre = None  # 上家
+        self.next = None  # 下家
         self.use_sha_count = 0  # 使用杀的次数
         self.use_jiu_count = 0  # 使用酒的次数
         self.jiu = 0  # 是否喝酒
