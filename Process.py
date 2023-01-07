@@ -81,20 +81,20 @@ def Game_Process(player: player,Items: items.Items):
                 pandin_name = player.pandin_area[-1].name
                 print('即将判定{}'.format(pandin_name))
                 # ask_wuxiekeji()
-                result = Pandin_Process(player)
+                result = Pandin_Process(player, Items)
                 if pandin_name == '兵粮寸断':
                     if result[0] != '梅花':
                         game_process_tmp.remove('when_getcard_start')
                         game_process_tmp.remove('getcard')
                         game_process_tmp.remove('when_getcard_end')
-                    left_card_heap.card_list.append(player.pandin_area[-1])
+                    Items.LeftCardHeap.card_list.append(player.pandin_area[-1])
                     del player.pandin_area[-1]
                 elif pandin_name == '乐不思蜀':
                     if result[0] != '红桃':
                         game_process_tmp.remove('when_usecard_start')
                         game_process_tmp.remove('usecard')
                         game_process_tmp.remove('when_usecard_end')
-                    left_card_heap.card_list.append(player.pandin_area[-1])
+                    Items.LeftCardHeap.card_list.append(player.pandin_area[-1])
                     del player.pandin_area[-1]
                 elif pandin_name == '闪电':
                     if (result[0] == '黑桃') & (result[1] >= 2) & (result[1] <= 9):
@@ -104,7 +104,7 @@ def Game_Process(player: player,Items: items.Items):
                         del player.pandin_area[-1]
 
         elif time == 'getcard':
-            for card in get_card_heap.get_card(2, left_card_heap):
+            for card in Items.GetCardHeap.get_card(2, Items.LeftCardHeap):
                 player.HandCards_area.append(card)
 
         elif time == 'usecard':
@@ -141,9 +141,9 @@ def Game_Process(player: player,Items: items.Items):
                         if card.name == '铁索连环':
                             player_input = eval(input('请选择重铸或使用(0表示重铸,1表示使用):'))
                             if not player_input:
-                                left_card_heap.card_list.append(card)
+                                Items.LeftCardHeap.card_list.append(card)
                                 player.HandCards_area.remove(card)
-                                player.HandCards_area.append(get_card_heap.get_card(1, left_card_heap)[0])
+                                player.HandCards_area.append(Items.GetCardHeap.get_card(1, Items.LeftCardHeap)[0])
                                 break
                         Use_Card_process(card, player)
                         break
@@ -161,36 +161,38 @@ def Game_Process(player: player,Items: items.Items):
                 else:
                     left_cards = list(left_cards)
                 for i in range(len(left_cards)):
-                    left_card_heap.card_list.append(player.HandCards_area[left_cards[-1] - 1])
+                    Items.LeftCardHeap.card_list.append(player.HandCards_area[left_cards[-1] - 1])
                     del player.HandCards_area[left_cards[-1] - 1], left_cards[-1]
 
 
 # 判定流程
-def Pandin_Process(player):
+def Pandin_Process(player, Items):
     """
 
     player: 判定角色
+    Items: 场上状态
     return: 判定结果
 
     """
     for time in pandin_process:
         # check_skill(time) 检查是否有武将技能发动
         if time == 'when_pandin':
-            res_card = get_card_heap.get_card(1, left_card_heap)
+            res_card = Items.GetCardHeap.get_card(1, Items.LeftCardHeap)
             res = [res_card[0].color, res_card[0].point]
             print('判定结果为:', res)
-            left_card_heap.card_list.append(res_card)
+            Items.LeftCardHeap.card_list.append(res_card)
     return res
 
 
 # 使用牌流程
 def Use_Card_process(card: Card.card,
-                     player: player):
+                     player: player,
+                     Items: items.Items):
     """
 
     card: 被使用的牌
     player: 使用牌的玩家
-
+    Items: 场上状态
 
     """
 
@@ -346,8 +348,8 @@ def Use_Card_process(card: Card.card,
     # 使用结算准备结算结束时
     if card.name == '五谷丰登':
         for i in range(len(player_list)):
-            tmp_card.append(get_card_heap.get_card(1, left_card_heap)[0])
-        print([[card.name, card.color, card.point] for card in tmp_card])
+            Items.TmpCard.append(Items.GetCardHeap.get_card(1, Items.LeftCardHeap)[0])
+        print([[card.name, card.color, card.point] for card in Items.TmpCard])
         Use_Clear_Process(player, card, target)
         return
     if type(card) == Card.yanshi_jinnang_card:
@@ -355,27 +357,27 @@ def Use_Card_process(card: Card.card,
         return
     if type(card) is Card.weapon_card:
         if player.equipment_area['武器'] is not None:
-            left_card_heap.card_list.append(player.equipment_area['武器'])
+            Items.LeftCardHeap.card_list.append(player.equipment_area['武器'])
         player.equipment_area['武器'] = card
         card.player = player
     elif type(card) is Card.armour_card:
         if player.equipment_area['防具'] is not None:
-            left_card_heap.card_list.append(player.equipment_area['防具'])
+            Items.LeftCardHeap.card_list.append(player.equipment_area['防具'])
         player.equipment_area['防具'] = card
         card.player = player
     elif type(card) is Card.attack_horse_card:
         if player.equipment_area['进攻坐骑'] is not None:
-            left_card_heap.card_list.append(player.equipment_area['进攻坐骑'])
+            Items.LeftCardHeap.card_list.append(player.equipment_area['进攻坐骑'])
         player.equipment_area['进攻坐骑'] = card
         card.player = player
     elif type(card) is Card.defense_horse_card:
         if player.equipment_area['防御坐骑'] is not None:
-            left_card_heap.card_list.append(player.equipment_area['防御坐骑'])
+            Items.LeftCardHeap.card_list.append(player.equipment_area['防御坐骑'])
         player.equipment_area['防御坐骑'] = card
         card.player = player
     elif type(card) is Card.treasure_card:
         if player.equipment_area['宝物'] is not None:
-            left_card_heap.card_list.append(player.equipment_area['宝物'])
+            Items.LeftCardHeap.card_list.append(player.equipment_area['宝物'])
         player.equipment_area['宝物'] = card
         card.player = player
     if len(target_2) > 0:
@@ -387,12 +389,14 @@ def Use_Card_process(card: Card.card,
 def Use_Clear_Process(player: player,
                       card: Card.card,
                       target: List[player],
+                      Items: items.Items,
                       b_target: player = None):
     """
 
     player: 使用玩家
     card: 被使用的牌
     target: 目标列表
+    Items: 场上状态
     b_target: 借刀杀人指定的被杀目标
 
     """
@@ -460,13 +464,13 @@ def Use_Clear_Process(player: player,
         elif card.name == '无懈可击':
             return 1
         elif card.name == '无中生有':
-            for get_card in get_card_heap.get_card(2, left_card_heap):
+            for get_card in Items.GetCardHeap.get_card(2, Items.LeftCardHeap):
                 player.HandCards_area.append(get_card)
         elif card.name == '五谷丰登':
             idx = eval(input('{}号位请选择获得一张牌:'.format(target[i].idx))) - 1
-            target[i].HandCards_area.append(tmp_card[idx])
-            del tmp_card[idx]
-            print([[card.name, card.color, card.point] for card in tmp_card])
+            target[i].HandCards_area.append(Items.TmpCard[idx])
+            del Items.TmpCard[idx]
+            print([[card.name, card.color, card.point] for card in Items.TmpCard])
         elif card.name == '铁索连环':
             target[i].hengzhi = not target[i].hengzhi
         elif card.name == '火攻':
@@ -482,7 +486,7 @@ def Use_Clear_Process(player: player,
                 continue
             left_card: Card.card = player.HandCards_area[left_card - 1]
             if show_card.color == left_card.color:
-                left_card_heap.card_list.append(left_card)
+                Items.LeftCardHeap.card_list.append(left_card)
                 player.HandCards_area.remove(left_card)
                 Damage_Process(player, card, player, target[i], 1, True)
         elif card.name == '桃园结义':
@@ -531,39 +535,39 @@ def Use_Clear_Process(player: player,
                     player_input = eval(player_input)
                 except NameError:
                     if player_input == 'w' and target[i].equipment_area['武器'].name is not None:
-                        left_card_heap.card_list.append(target[i].equipment_area['武器'])
+                        Items.LeftCardHeap.card_list.append(target[i].equipment_area['武器'])
                         target[i].equipment_area['武器'] = Card.weapon_card(None, None, None, None)
                         break
                     elif player_input == 'a' and target[i].equipment_area['防具'].name is not None:
-                        left_card_heap.card_list.append(target[i].equipment_area['防具'])
+                        Items.LeftCardHeap.card_list.append(target[i].equipment_area['防具'])
                         target[i].equipment_area['防具'] = Card.armour_card(None, None, None)
                         break
                     elif player_input == '-1' and target[i].equipment_area['进攻坐骑'].name is not None:
-                        left_card_heap.card_list.append(target[i].equipment_area['进攻坐骑'])
+                        Items.LeftCardHeap.card_list.append(target[i].equipment_area['进攻坐骑'])
                         target[i].equipment_area['进攻坐骑'] = Card.defense_horse_card(None, None, None)
                         break
                     elif player_input == '+1' and target[i].equipment_area['防御坐骑'].name is not None:
-                        left_card_heap.card_list.append(target[i].equipment_area['防御坐骑'])
+                        Items.LeftCardHeap.card_list.append(target[i].equipment_area['防御坐骑'])
                         target[i].equipment_area['防御坐骑'] = Card.attack_horse_card(None, None, None)
                         break
                     elif player_input == 't' and target[i].equipment_area['宝物'].name is not None:
-                        left_card_heap.card_list.append(target[i].equipment_area['宝物'])
+                        Items.LeftCardHeap.card_list.append(target[i].equipment_area['宝物'])
                         target[i].equipment_area['宝物'] = Card.treasure_card(None, None, None)
                         break
                     elif player_input == 'b' and '兵粮寸断' in [card.name for card in target[i].pandin_area]:
-                        left_card_heap.card_list.append(
+                        Items.LeftCardHeap.card_list.append(
                             [card for card in target[i].pandin_area if card.name == '兵粮寸断'][0])
                         target[i].pandin_area.remove(
                             [card for card in target[i].pandin_area if card.name == '兵粮寸断'][0])
                         break
                     elif player_input == 'l' and '乐不思蜀' in [card.name for card in target[i].pandin_area]:
-                        left_card_heap.card_list.append(
+                        Items.LeftCardHeap.card_list.append(
                             [card for card in target[i].pandin_area if card.name == '乐不思蜀'][0])
                         target[i].pandin_area.remove(
                             [card for card in target[i].pandin_area if card.name == '乐不思蜀'][0])
                         break
                     elif player_input == 's' and '闪电' in [card.name for card in target[i].pandin_area]:
-                        left_card_heap.card_list.append(
+                        Items.LeftCardHeap.card_list.append(
                             [card for card in target[i].pandin_area if card.name == '闪电'][0])
                         target[i].pandin_area.remove([card for card in target[i].pandin_area if card.name == '闪电'][0])
                         break
@@ -574,9 +578,9 @@ def Use_Clear_Process(player: player,
                 except (IndexError, TypeError):
                     continue
             if type(player_input) == int:
-                left_card_heap.card_list.append(left_card)
+                Items.LeftCardHeap.card_list.append(left_card)
                 del target[i].HandCards_area[player_input - 1]
-            print('被弃置的牌为:{}'.format(left_card_heap.card_list[-1].name))
+            print('被弃置的牌为:{}'.format(Items.LeftCardHeap.card_list[-1].name))
         elif card.name == '顺手牵羊':
             get_card: Card.card = Card.card(None, None, None)
             while 1:
@@ -680,10 +684,10 @@ def Use_Clear_Process(player: player,
                         j = 0
                     continue
                 
-    if len(tmp_card) > 0:
-        for i in tmp_card:
-            left_card_heap.card_list.append(i)
-    left_card_heap.card_list.append(card)
+    if len(Items.TmpCard) > 0:
+        for i in Items.TmpCard:
+            Items.LeftCardHeap.card_list.append(i)
+    Items.LeftCardHeap.card_list.append(card)
     wuxie_count = 0
 
 
