@@ -34,7 +34,7 @@ class Button:
 
 
 # 创建手牌类
-class draw_Card:
+class DrawCard:
     def __init__(self, image_path, x, y, card_width, card_height):
         # 加载图像
         self.image = pygame.image.load(image_path)
@@ -72,7 +72,7 @@ cards = []
 for i, card_image in enumerate(card_images):
     x = hand_x + i * (card_width + card_spacing)
     y = hand_y
-    card = draw_Card(card_image, x, y, card_width, card_height)
+    card = DrawCard(card_image, x, y, card_width, card_height)
     cards.append(card)
 
 # 设置按钮的位置

@@ -1,10 +1,10 @@
-# Player.py
+# player.py
 
 # 玩家类
-import Card
+import card
 
 
-class player:
+class Player:
     def __init__(self, commander):
         self.commander = commander  # 武将
         self.skills = commander.skills
@@ -14,11 +14,11 @@ class player:
         self.idx = 0  # 座次
         self.identity = ''  # 身份信息
         self.equipment_area = {  # 装备区
-            '武器': Card.weapon_card(None, None, None, None),
-            '防具': Card.armour_card(None, None, None),
-            '进攻坐骑': Card.defense_horse_card(None, None, None),
-            '防御坐骑': Card.attack_horse_card(None, None, None),
-            '宝物': Card.treasure_card(None, None, None)
+            '武器': card.WeaponCard(None, None, None, None),
+            '防具': card.ArmourCard(None, None, None),
+            '进攻坐骑': card.DefenseHorseCard(None, None, None),
+            '防御坐骑': card.AttackHorseCard(None, None, None),
+            '宝物': card.TreasureCard(None, None, None)
         }
         self.HandCards_area = []  # 手牌区
         self.pandin_area = []  # 判定区

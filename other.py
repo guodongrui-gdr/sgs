@@ -1,40 +1,39 @@
 import numpy as np
+from typing import List
+from player import Player
+from skill import Skill
+import process
 
-from Player import player
-import Process
+
 def check_skill(time, current_player, target_player, Items):  # 检查是否有技能能发动
     # 先将场上全部武将技能放在列表中
-    AllSkills = []
-    TriggerableSkill = []
+    AllSkills: List[Skill] = []
     for p in Items.PlayerList:
         for skill in p.skills:
             AllSkills.append(skill)
-    if time == 'af_hurt':
-        for skill in AllSkills:
-            if skill.name == '奸雄' and skill in target_player.skills:
-                skill.target = target_player
-                TriggerableSkill.append(skill)
-    return TriggerableSkill
+    for s in AllSkills:
+        if s.check_time(time) and s.check_con(Items) and s.state():
+            s.trigger(Items)
 
 
 def wuxie(Items, card, wuxie_count):
     for j in Items.PlayerList:
         if '无懈可击' not in [w.name for w in j.HandCards_area]:
             continue
-        print('{}号位手牌为{}'.format(j.idx,
-                                      [[card.name, card.color, card.point] for card in
-                                       j.HandCards_area]))
+        print('{}号位手牌为{}'.format(j.idx, [[card.name, card.color, card.point] for card in j.HandCards_area]))
         wuxie = eval(input('{}号位是否使用无懈可击, 0表示不使用无懈可击, i表示使用第i张牌'.format(j.idx)))
         if not wuxie:
             continue
         wuxie = j.HandCards_area[wuxie - 1]
         if wuxie.name == '无懈可击':
             wuxie.target = card
-            wuxie_count += Process.Use_Card_process(wuxie, j, Items)
+            wuxie_count += process.use_card_process(wuxie, j, Items)
             if wuxie_count:
                 return 0
     return 1
-def isAreaEmpty(player: player) -> bool:  # 判断玩家区域内是否有牌
+
+
+def isAreaEmpty(player: Player) -> bool:  # 判断玩家区域内是否有牌
     return len(player.HandCards_area) == 0 and len(player.pandin_area) == 0 and np.array(
         [v.name for k, v in player.equipment_area.items()]).all() is None
 
@@ -87,14 +86,14 @@ def PrintPlayer(player):  # 打印玩家信息
 
 
 # 检查是否满足游戏胜利条件
-def check_vic(dead_player: player, player_list) -> int:
-    '''
+def check_vic(dead_player: Player, player_list) -> int:
+    """
 
     dead_player: 死亡角色
     return: 1: 主公和忠臣获胜
             2: 反贼获胜
             3: 内奸获胜
-    '''
+    """
     if dead_player.identity == '主公':
         if len(player_list) == 1 and player_list[0].identity == '内奸':
             return 3
