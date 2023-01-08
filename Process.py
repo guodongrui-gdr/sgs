@@ -72,7 +72,6 @@ def Game_Process(player: player, Items: items.Items):
     player: 当前回合角色
 
     """
-    global wuxie_count
     game_process_tmp = game_process.copy()
     isEnd = 0
     for time in game_process_tmp:
@@ -82,43 +81,35 @@ def Game_Process(player: player, Items: items.Items):
                 card = player.pandin_area[-1]
                 pandin_name = card.name
                 print('即将判定{}'.format(pandin_name))
-                for j in Items.PlayerList:
-                    if '无懈可击' not in [w.name for w in j.HandCards_area]:
-                        continue
-                    print('{}号位手牌为{}'.format(j.idx,
-                                                  [[card.name, card.color, card.point] for card in
-                                                   j.HandCards_area]))
-                    wuxie = eval(input('{}号位是否使用无懈可击, 0表示不使用无懈可击, i表示使用第i张牌'.format(j.idx)))
-                    if not wuxie:
-                        continue
-                    wuxie = j.HandCards_area[wuxie - 1]
-                    if wuxie.name == '无懈可击':
-                        wuxie.target = card
-                        wuxie_count += Use_Card_process(wuxie, j, Items)
-                        if wuxie_count:
-                            return 0
-                result = Pandin_Process(player, Items)
-                if pandin_name == '兵粮寸断':
-                    if result[0] != '梅花':
-                        game_process_tmp.remove('when_getcard_start')
-                        game_process_tmp.remove('getcard')
-                        game_process_tmp.remove('when_getcard_end')
-                    Items.LeftCardHeap.card_list.append(player.pandin_area[-1])
-                    del player.pandin_area[-1]
-                elif pandin_name == '乐不思蜀':
-                    if result[0] != '红桃':
-                        game_process_tmp.remove('when_usecard_start')
-                        game_process_tmp.remove('usecard')
-                        game_process_tmp.remove('when_usecard_end')
-                    Items.LeftCardHeap.card_list.append(player.pandin_area[-1])
-                    del player.pandin_area[-1]
-                elif pandin_name == '闪电':
-                    if (result[0] == '黑桃') & (result[1] >= 2) & (result[1] <= 9):
-                        Damage_Process(None, player.pandin_area[-1], player, player, 3, True, Items)
-                    else:
+                if wuxie(Items, card, wuxie_count):
+                    result = Pandin_Process(player, Items)
+                    if pandin_name == '兵粮寸断':
+                        if result[0] != '梅花':
+                            game_process_tmp.remove('when_getcard_start')
+                            game_process_tmp.remove('getcard')
+                            game_process_tmp.remove('when_getcard_end')
+                        Items.LeftCardHeap.card_list.append(player.pandin_area[-1])
+                        del player.pandin_area[-1]
+                    elif pandin_name == '乐不思蜀':
+                        if result[0] != '红桃':
+                            game_process_tmp.remove('when_usecard_start')
+                            game_process_tmp.remove('usecard')
+                            game_process_tmp.remove('when_usecard_end')
+                        Items.LeftCardHeap.card_list.append(player.pandin_area[-1])
+                        del player.pandin_area[-1]
+                    elif pandin_name == '闪电':
+                        if (result[0] == '黑桃') & (result[1] >= 2) & (result[1] <= 9):
+                            Damage_Process(None, player.pandin_area[-1], player, player, 3, True, Items)
+                        else:
+                            player.next.pandin_area.append(player.pandin_area[-1])
+                            del player.pandin_area[-1]
+                else:
+                    if pandin_name == '闪电':
                         player.next.pandin_area.append(player.pandin_area[-1])
                         del player.pandin_area[-1]
-
+                    else:
+                        Items.LeftCardHeap.card_list.append(player.pandin_area[-1])
+                        del player.pandin_area[-1]
         elif time == 'getcard':
             for card in Items.GetCardHeap.get_card(2, Items.LeftCardHeap):
                 player.HandCards_area.append(card)
@@ -366,9 +357,9 @@ def Use_Card_process(card: Card.card,
 
     # 使用结算准备结算结束时
     if card.name == '五谷丰登':
-        for i in range(len(Items.PlayerList)):
+        for i in range(len(card.target)):
             Items.TmpCard.append(Items.GetCardHeap.get_card(1, Items.LeftCardHeap)[0])
-        print([[card.name, card.color, card.point] for card in Items.TmpCard])
+        print([[card.name, card.color, card.point] for card in Items.TmpCard[-len(card.target):]])
         Use_Clear_Process(player, card, target, Items)
         return
     if type(card) == Card.yanshi_jinnang_card:
@@ -378,26 +369,31 @@ def Use_Card_process(card: Card.card,
     if type(card) is Card.weapon_card:
         if player.equipment_area['武器'] is not None:
             Items.LeftCardHeap.card_list.append(player.equipment_area['武器'])
+        Items.TmpCard.remove(card)
         player.equipment_area['武器'] = card
         card.player = player
     elif type(card) is Card.armour_card:
         if player.equipment_area['防具'] is not None:
             Items.LeftCardHeap.card_list.append(player.equipment_area['防具'])
+        Items.TmpCard.remove(card)
         player.equipment_area['防具'] = card
         card.player = player
     elif type(card) is Card.attack_horse_card:
         if player.equipment_area['进攻坐骑'] is not None:
             Items.LeftCardHeap.card_list.append(player.equipment_area['进攻坐骑'])
+        Items.TmpCard.remove(card)
         player.equipment_area['进攻坐骑'] = card
         card.player = player
     elif type(card) is Card.defense_horse_card:
         if player.equipment_area['防御坐骑'] is not None:
             Items.LeftCardHeap.card_list.append(player.equipment_area['防御坐骑'])
+        Items.TmpCard.remove(card)
         player.equipment_area['防御坐骑'] = card
         card.player = player
     elif type(card) is Card.treasure_card:
         if player.equipment_area['宝物'] is not None:
             Items.LeftCardHeap.card_list.append(player.equipment_area['宝物'])
+        Items.TmpCard.remove(card)
         player.equipment_area['宝物'] = card
         card.player = player
     if len(target_2) > 0:
@@ -432,6 +428,9 @@ def Use_Clear_Process(player: player,
             continue
         # 生效前
         if type(card) == Card.common_jinnang_card:
+            if wuxie(Items, card, wuxie_count)!= 0:
+                continue
+            '''
             for j in Items.PlayerList:
                 if '无懈可击' not in [w.name for w in j.HandCards_area]:
                     continue
@@ -445,6 +444,7 @@ def Use_Clear_Process(player: player,
                     wuxie_count += Use_Card_process(wuxie, j, Items)
                     if wuxie_count:
                         return 0
+            '''
         if '杀' in card.name and type(card) == Card.basic_card:
             shan = 0
             if '闪' not in [card.name for card in target[i].HandCards_area]:

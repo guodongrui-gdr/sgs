@@ -1,17 +1,39 @@
 import numpy as np
 
 from Player import player
-
-
-def check_skill(time, current_player, target_player, Items):
-    skills = []
+import Process
+def check_skill(time, current_player, target_player, Items):  # 检查是否有技能能发动
+    # 先将场上全部武将技能放在列表中
+    AllSkills = []
+    TriggerableSkill = []
+    for p in Items.PlayerList:
+        for skill in p.skills:
+            AllSkills.append(skill)
     if time == 'af_hurt':
-        for skill in [player.skills for player in Items.PlayerList]:
-            if skill[0].name == '奸雄' and skill[0] in target_player.skills:
-                skill[0].target = target_player
-                skills.append(skill[0])
-    return skills
+        for skill in AllSkills:
+            if skill.name == '奸雄' and skill in target_player.skills:
+                skill.target = target_player
+                TriggerableSkill.append(skill)
+    return TriggerableSkill
 
+
+def wuxie(Items, card, wuxie_count):
+    for j in Items.PlayerList:
+        if '无懈可击' not in [w.name for w in j.HandCards_area]:
+            continue
+        print('{}号位手牌为{}'.format(j.idx,
+                                      [[card.name, card.color, card.point] for card in
+                                       j.HandCards_area]))
+        wuxie = eval(input('{}号位是否使用无懈可击, 0表示不使用无懈可击, i表示使用第i张牌'.format(j.idx)))
+        if not wuxie:
+            continue
+        wuxie = j.HandCards_area[wuxie - 1]
+        if wuxie.name == '无懈可击':
+            wuxie.target = card
+            wuxie_count += Process.Use_Card_process(wuxie, j, Items)
+            if wuxie_count:
+                return 0
+    return 1
 def isAreaEmpty(player: player) -> bool:  # 判断玩家区域内是否有牌
     return len(player.HandCards_area) == 0 and len(player.pandin_area) == 0 and np.array(
         [v.name for k, v in player.equipment_area.items()]).all() is None
@@ -58,10 +80,10 @@ def PrintPlayer(player):  # 打印玩家信息
     print('当前体力值为:{}/{}'.format(player.current_HP, player.max_HP))
     print('是否被横置:{}'.format(hengzhi_dic[player.hengzhi]))
     print('装备区有武器牌:{},防具牌:{}, 进攻坐骑:{}, 防御坐骑:{},宝物:{}'.format(player.equipment_area['武器'].name,
-                                                             player.equipment_area['防具'].name,
-                                                             player.equipment_area['进攻坐骑'].name,
-                                                             player.equipment_area['防御坐骑'].name,
-                                                             player.equipment_area['宝物'].name))
+                                                                                 player.equipment_area['防具'].name,
+                                                                                 player.equipment_area['进攻坐骑'].name,
+                                                                                 player.equipment_area['防御坐骑'].name,
+                                                                                 player.equipment_area['宝物'].name))
 
 
 # 检查是否满足游戏胜利条件

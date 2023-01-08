@@ -10,8 +10,8 @@ class JianXiong():
     def trigger(self, Items):
         if eval(input('是否发动奸雄:')):
             for i in range(len(Items.TmpCard)):
-                self.target.HandCards_area.append(Items.TmpCard[i])
-                del Items.TmpCard[i]
+                self.target.HandCards_area.append(Items.TmpCard[-1])
+                del Items.TmpCard[-1]
 
 
 Jianxiong = JianXiong()
