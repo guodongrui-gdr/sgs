@@ -9,19 +9,17 @@ from process import *
 if __name__ == '__main__':
     player_num = 2  # 游戏人数
     print('游戏开始')
-    Items = items.Items()
+    # 初始化
+    Items = items.Items(2)
     commanders = [commander.Caocao for _ in range(player_num)]
     Items.PlayerList = [Player(c) for c in commanders]
-    # 初始化
-    Items.GetCardHeap = GetCardHeap()
-    Items.GetCardHeap.init_card_heap()  # 初始化摸牌堆
-    identity_card_heap = IdnetityCardHeap()
-    identity_card_heap.init_card_heap(player_num)  # 初始化身份牌堆
-    Items.LeftCardHeap = LeftCardHeap()
+    for p in Items.PlayerList:
+        for skill in p.skills:
+            skill.use_player = p
 
     # 抽取身份
     for i in range(player_num):
-        Items.PlayerList[i].identity = identity_card_heap.get_identity()
+        Items.PlayerList[i].identity = Items.IdentityCardHeap.get_identity()
 
     # 确定座次
     player_list_cache = np.zeros(player_num, Player)
@@ -59,6 +57,10 @@ if __name__ == '__main__':
         for start_card in Items.GetCardHeap.get_card(4, Items.LeftCardHeap):
             player.HandCards_area.append(start_card)
     # check_skill()
+
+    # debug
+    # Items.PlayerList[1].equipment_area['防御坐骑'] = DefenseHorseCard('爪黄飞电', '红桃', 13)
+
     # 回合开始
     round = 1  # 轮数
     while 1:
