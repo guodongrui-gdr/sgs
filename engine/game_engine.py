@@ -136,6 +136,15 @@ class GameEngine:
         player.hand_cards.remove(card)
         self.tmp_cards.append(card)
 
+        before_event = self._emit_event(
+            EventType.BEFORE_USE_CARD, source=player, target=target, card=card
+        )
+
+        if before_event.is_cancelled():
+            player.hand_cards.append(card)
+            self.tmp_cards.remove(card)
+            return False
+
         event = self._emit_event(
             EventType.CARD_USED, source=player, target=target, card=card
         )

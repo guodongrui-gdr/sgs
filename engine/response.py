@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from player.player import Player
     from card.base import Card
     from engine.game_engine import GameEngine
+    from engine.event import EventType
 
 
 class ResponseType(Enum):
@@ -196,8 +197,19 @@ class CardResolver:
         self.response_system = ResponseSystem(engine)
 
     def resolve_sha(self, source: "Player", target: "Player", card: "Card") -> bool:
+        from engine.event import EventType
+
         damage = 1 + source.jiu_effect
         is_elemental = "火" in card.name or "雷" in card.name
+
+        ask_event = self.engine._emit_event(
+            EventType.ASK_FOR_SHA,
+            source=source,
+            target=target,
+            card=card,
+        )
+        if ask_event.is_cancelled():
+            return False
 
         if target.equipment.get("防具"):
             armour = target.equipment["防具"]
@@ -334,6 +346,7 @@ class CardResolver:
         return damaged_players
 
     def resolve_wanjianqifa(self, source: "Player") -> List["Player"]:
+        from engine.event import EventType
         # print(f"\n{source.commander_name} 使用万箭齐发!")
 
         if self.response_system.ask_for_wuxie(
@@ -350,6 +363,14 @@ class CardResolver:
             if self.response_system.ask_for_wuxie(
                 source, type("MockCard", (), {"name": "万箭齐发"})(), player
             ):
+                continue
+
+            ask_event = self.engine._emit_event(
+                EventType.ASK_FOR_SHAN,
+                source=source,
+                target=player,
+            )
+            if ask_event.is_cancelled():
                 continue
 
             request = ResponseRequest(

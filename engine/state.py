@@ -48,6 +48,9 @@ class PlayerState:
             "skills": self.skills,
             "is_chained": self.is_chained,
             "is_alive": self.is_alive,
+            "sha_count": self.sha_count,
+            "jiu_count": self.jiu_count,
+            "jiu_effect": self.jiu_effect,
         }
 
 

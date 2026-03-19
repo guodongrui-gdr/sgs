@@ -29,23 +29,29 @@ class RewardConfig:
     """奖励配置"""
 
     # 终局奖励
-    victory: float = 10.0
-    defeat: float = -10.0
+    victory: float = 100.0
+    defeat: float = -100.0
 
-    # 伤害奖励 (不使用身份)
-    damage_dealt: float = 0.1
-    damage_taken: float = -0.1
+    # 伤害奖励
+    damage_dealt: float = 1.0
+    damage_taken: float = -1.0
 
-    # 击杀奖励 (使用目标的公开身份)
-    kill_enemy: float = 2.0
-    kill_ally: float = -3.0
-    lord_kill_loyalist: float = -5.0
+    # 击杀奖励
+    kill_enemy: float = 20.0
+    kill_ally: float = -30.0
+    lord_kill_loyalist: float = -50.0
 
     # 存活奖励
-    survive_per_turn: float = 0.01
+    survive_per_turn: float = 0.1
 
     # 内奸最后存活
-    spy_last_survive: float = 5.0
+    spy_last_survive: float = 50.0
+
+    # 使用关键卡牌奖励
+    use_sha_reward: float = 0.5
+    use_tao_reward: float = 1.0
+    use_taoyuan_reward: float = 2.0
+    use_nanman_reward: float = 3.0
 
 
 @dataclass
@@ -312,7 +318,7 @@ class SpyRewardCalculator(RewardCalculator):
 class PotentialBasedReward:
     """基于势能的奖励塑形"""
 
-    def __init__(self, gamma: float = 0.99):
+    def __init__(self, gamma: float = 0.5):
         self.gamma = gamma
         self.prev_potential = 0.0
 
@@ -328,20 +334,20 @@ class PotentialBasedReward:
 
         player = players[player_idx]
 
-        # 1. 体力势能
+        # 1. 体力势能 (缩放以减少波动)
         hp_ratio = player.get("current_hp", 0) / max(player.get("max_hp", 1), 1)
-        potential += hp_ratio * 10
+        potential += hp_ratio * 1.0
 
         # 2. 手牌势能
         hand_count = len(player.get("hand_cards", []))
         hand_limit = player.get("current_hp", 0)
         hand_advantage = hand_count - hand_limit
-        potential += hand_advantage * 2
+        potential += hand_advantage * 0.2
 
         # 3. 装备势能
         equipment = player.get("equipment", {})
         equip_count = sum(1 for v in equipment.values() if v)
-        potential += equip_count * 3
+        potential += equip_count * 0.3
 
         return potential
 

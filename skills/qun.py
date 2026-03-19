@@ -24,6 +24,15 @@ class Jiuji(ActiveSkill):
         red_cards = [c for c in self.player.hand_cards if c.is_red()]
         return len(red_cards) > 0
 
+    def is_available(self, engine: "GameEngine") -> bool:
+        """检查急救是否可用：需要有红色牌"""
+        if not self.player:
+            return False
+        red_cards = [
+            c for c in self.player.hand_cards if hasattr(c, "is_red") and c.is_red()
+        ]
+        return len(red_cards) > 0
+
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if not self.player:
             return event
@@ -37,8 +46,8 @@ class Jiuji(ActiveSkill):
                 card = red_cards[idx]
                 event.data["use_as_tao"] = card
                 # print(
-                    #     f">>> {self.player.commander_name} 发动【急救】，将 {card} 当桃使用"
-                    # )
+                #     f">>> {self.player.commander_name} 发动【急救】，将 {card} 当桃使用"
+                # )
         else:
             card = red_cards[0]
             event.data["use_as_tao"] = card
@@ -55,11 +64,27 @@ class Qingnang(ActiveSkill):
             trigger_events=[],
             description="出牌阶段限一次，你可以弃置一张手牌并选择一名其他角色，令其回复1点体力",
         )
+        self.max_uses_per_turn = 1
 
     def can_activate(self, event: Event, engine: "GameEngine") -> bool:
         if not self.player:
             return False
-        if self.player.qingnang_used:
+        if not self.can_use():
+            return False
+        if not self.player.hand_cards:
+            return False
+        others_need_heal = [
+            p
+            for p in engine.players
+            if p != self.player and p.is_alive and p.current_hp < p.max_hp
+        ]
+        return len(others_need_heal) > 0
+
+    def is_available(self, engine: "GameEngine") -> bool:
+        """检查青囊是否可用：需要有手牌、本回合未使用、有需要治疗的角色"""
+        if not self.player:
+            return False
+        if not self.can_use():
             return False
         if not self.player.hand_cards:
             return False
@@ -85,8 +110,8 @@ class Qingnang(ActiveSkill):
         if self.ask_player("是否发动【青囊】?"):
             if self.player.is_human:
                 # print(
-                    #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
-                    # )
+                #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
+                # )
                 card_idx = int(input("选择弃置的牌: ")) - 1
                 if not (0 <= card_idx < len(self.player.hand_cards)):
                     return event
@@ -110,10 +135,10 @@ class Qingnang(ActiveSkill):
 
             engine.discard_pile.append(card)
             target.current_hp = min(target.max_hp, target.current_hp + 1)
-            self.player.qingnang_used = True
+            self.use()
             # print(
-                #     f">>> {self.player.commander_name} 发动【青囊】，弃置 {card}，令 {target.commander_name} 回复1点体力"
-                # )
+            #     f">>> {self.player.commander_name} 发动【青囊】，弃置 {card}，令 {target.commander_name} 回复1点体力"
+            # )
 
         return event
 
@@ -156,11 +181,12 @@ class Lijian(ActiveSkill):
             trigger_events=[],
             description="出牌阶段限一次，你可以弃置一张手牌并选择两名男性角色，令其中一名角色对另一名角色使用杀",
         )
+        self.max_uses_per_turn = 1
 
     def can_activate(self, event: Event, engine: "GameEngine") -> bool:
         if not self.player:
             return False
-        if self.player.lijian_used:
+        if not self.can_use():
             return False
         if not self.player.hand_cards:
             return False
@@ -168,6 +194,21 @@ class Lijian(ActiveSkill):
             p
             for p in engine.players
             if p != self.player and p.is_alive and p.gender == "male"
+        ]
+        return len(males) >= 2
+
+    def is_available(self, engine: "GameEngine") -> bool:
+        """检查离间是否可用：需要有手牌、本回合未使用、至少2名男性角色"""
+        if not self.player:
+            return False
+        if not self.can_use():
+            return False
+        if not self.player.hand_cards:
+            return False
+        males = [
+            p
+            for p in engine.players
+            if p != self.player and p.is_alive and getattr(p, "gender", "") == "male"
         ]
         return len(males) >= 2
 
@@ -186,8 +227,8 @@ class Lijian(ActiveSkill):
         if self.ask_player("是否发动【离间】?"):
             if self.player.is_human:
                 # print(
-                    #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
-                    # )
+                #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
+                # )
                 card_idx = int(input("选择弃置的牌: ")) - 1
                 if not (0 <= card_idx < len(self.player.hand_cards)):
                     return event
@@ -220,11 +261,11 @@ class Lijian(ActiveSkill):
                 source, target = random.sample(males, 2)
 
             engine.discard_pile.append(card)
-            self.player.lijian_used = True
+            self.use()
 
             # print(
-                #     f">>> {self.player.commander_name} 发动【离间】，令 {source.commander_name} 对 {target.commander_name} 使用杀"
-                # )
+            #     f">>> {self.player.commander_name} 发动【离间】，令 {source.commander_name} 对 {target.commander_name} 使用杀"
+            # )
 
             sha_cards = [c for c in source.hand_cards if "杀" in c.name]
             if sha_cards:
@@ -259,7 +300,7 @@ class Biyue(TriggerSkill):
             drawn = engine.draw_cards(self.player, 1)
             self.player.hand_cards.extend(drawn)
             # print(
-                #     f">>> {self.player.commander_name} 发动【闭月】，摸了 {drawn[0] if drawn else '牌'}"
-                # )
+            #     f">>> {self.player.commander_name} 发动【闭月】，摸了 {drawn[0] if drawn else '牌'}"
+            # )
 
         return event

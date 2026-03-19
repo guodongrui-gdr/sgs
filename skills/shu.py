@@ -21,6 +21,16 @@ class Rende(ActiveSkill):
     def can_activate(self, event: Event, engine: "GameEngine") -> bool:
         return self.player is not None and len(self.player.hand_cards) > 0
 
+    def is_available(self, engine: "GameEngine") -> bool:
+        """检查仁德是否可用：需要有手牌且有其他存活角色"""
+        if self.player is None:
+            return False
+        if len(self.player.hand_cards) == 0:
+            return False
+        # 检查是否有其他存活角色
+        others = [p for p in engine.players if p != self.player and p.is_alive]
+        return len(others) > 0
+
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if not self.player or not self.player.hand_cards:
             return event

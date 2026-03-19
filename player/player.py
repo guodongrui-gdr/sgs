@@ -50,11 +50,6 @@ class Player:
     cards_to_draw: int = 2
     luoyi_active: bool = False
     keji_active: bool = False
-    zhiheng_used: bool = False
-    fanjian_used: bool = False
-    jieyin_used: bool = False
-    qingnang_used: bool = False
-    lijian_used: bool = False
 
     def __post_init__(self):
         if not self.equipment:
@@ -120,11 +115,10 @@ class Player:
         self.cards_to_draw = 2
         self.luoyi_active = False
         self.keji_active = False
-        self.zhiheng_used = False
-        self.fanjian_used = False
-        self.jieyin_used = False
-        self.qingnang_used = False
-        self.lijian_used = False
+
+        # 重置所有技能的使用状态
+        for skill in self.skills:
+            skill.reset_turn_state()
 
     def to_dict(self) -> Dict:
         return {

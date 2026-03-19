@@ -175,6 +175,7 @@ class ActionMaskGenerator:
         self,
         game_state: Dict,
         player,
+        engine=None,
         current_step: int = 0,
         pending_action: HierarchicalAction = None,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -197,7 +198,9 @@ class ActionMaskGenerator:
 
         elif current_step == 1:
             masks_type = np.zeros(self.encoder.action_type_dim, dtype=np.float32)
-            masks_card = self._get_valid_cards(game_state, player, pending_action)
+            masks_card = self._get_valid_cards(
+                game_state, player, pending_action, engine
+            )
             masks_target = np.zeros(self.encoder.target_dim, dtype=np.float32)
 
         elif current_step == 2:
@@ -212,7 +215,9 @@ class ActionMaskGenerator:
 
         return masks_type, masks_card, masks_target
 
-    def _get_valid_action_types(self, game_state: Dict, player) -> np.ndarray:
+    def _get_valid_action_types(
+        self, game_state: Dict, player, engine=None
+    ) -> np.ndarray:
         """获取当前合法的动作类型"""
         masks = np.zeros(self.encoder.action_type_dim, dtype=np.float32)
 
@@ -224,7 +229,7 @@ class ActionMaskGenerator:
             masks[ActionType.END_TURN] = 1.0
             if self._has_usable_cards(player, game_state):
                 masks[ActionType.USE_CARD] = 1.0
-            if self._has_usable_skills(player):
+            if self._has_usable_skills(player, game_state, engine):
                 masks[ActionType.USE_SKILL] = 1.0
 
         elif phase == "discard_phase":
@@ -279,6 +284,7 @@ class ActionMaskGenerator:
         game_state: Dict,
         player,
         pending_action: HierarchicalAction,
+        engine=None,
     ) -> np.ndarray:
         """获取当前可用的卡牌/技能"""
         masks = np.zeros(self.encoder.card_dim, dtype=np.float32)
@@ -336,9 +342,43 @@ class ActionMaskGenerator:
             from skills.base import ActiveSkill
 
             skills = self._get_attr(player, "skills", [])
+            hand_cards = self._get_attr(player, "hand_cards", [])
+            hand_count = len(hand_cards)
+
+            # 获取当前阶段和玩家索引
+            phase = game_state.get("phase", "")
+            current_player_idx = game_state.get("current_player_idx", 0)
+            player_idx = self._get_attr(player, "idx") or self._get_attr(
+                player, "player_id", 0
+            )
+            is_my_turn = current_player_idx == player_idx
+
             for i, skill in enumerate(skills[: self.encoder.card_dim]):
                 if not isinstance(skill, ActiveSkill):
                     continue
+
+                # 调用 is_available 检查技能是否可用
+                if engine is not None:
+                    try:
+                        if not skill.is_available(engine):
+                            continue
+                    except Exception:
+                        # 如果 is_available 抛出异常，回退到基础检查
+                        pass
+
+                skill_name = self._get_attr(skill, "name", "")
+
+                # 急救：只能在回合外使用
+                if skill_name == "急救":
+                    if is_my_turn and phase == "play_phase":
+                        continue
+
+                # 特定技能的额外检查（兼容旧代码）
+                if skill_name == "仁德" and hand_count == 0:
+                    continue
+                if skill_name == "遗计" and hand_count == 0:
+                    continue
+
                 targets = self._get_skill_targets(
                     player, skill, game_state.get("players", [])
                 )
@@ -438,13 +478,40 @@ class ActionMaskGenerator:
                     return True
         return False
 
-    def _has_usable_skills(self, player) -> bool:
+    def _has_usable_skills(self, player, game_state: Dict = None, engine=None) -> bool:
         from skills.base import ActiveSkill
 
         skills = self._get_attr(player, "skills", [])
+        hand_cards = self._get_attr(player, "hand_cards", [])
+        hand_count = len(hand_cards)
+
         for skill in skills:
-            if isinstance(skill, ActiveSkill):
-                return True
+            if not isinstance(skill, ActiveSkill):
+                continue
+
+            skill_name = self._get_attr(skill, "name", "")
+
+            if skill_name == "仁德" and hand_count == 0:
+                continue
+            if skill_name == "仁德" or skill_name == "遗计":
+                if hand_count == 0:
+                    continue
+
+            if engine is not None:
+                try:
+                    if not skill.is_available(engine):
+                        continue
+                except Exception:
+                    pass
+
+            if game_state is not None:
+                targets = self._get_skill_targets(
+                    player, skill, game_state.get("players", [])
+                )
+                if len(targets) == 0:
+                    continue
+
+            return True
         return False
 
     def _can_modify_judge(self, player) -> bool:
@@ -454,39 +521,31 @@ class ActionMaskGenerator:
         return hand_count > 0
 
     def _can_use_card(self, player, card, game_state: Dict) -> bool:
-        """检查玩家是否可以使用某张牌"""
         if not hasattr(card, "name"):
             return False
 
         card_name = card.name
 
-        # 响应牌不能主动使用
         response_cards = ["闪"]
         if card_name in response_cards:
             return False
 
-        # 杀的限制
         if card_name == "杀":
-            if hasattr(player, "can_use_sha"):
-                return player.can_use_sha()
-            sha_count = player.sha_count if hasattr(player, "sha_count") else 0
             unlimited = (
                 player.unlimited_sha if hasattr(player, "unlimited_sha") else False
             )
+            sha_count = player.sha_count if hasattr(player, "sha_count") else 0
             return unlimited or sha_count < 1
 
-        # 酒的限制
         if card_name == "酒":
             jiu_count = player.jiu_count if hasattr(player, "jiu_count") else 0
             return jiu_count < 1
 
-        # 桃的限制
         if card_name == "桃":
             current_hp = player.current_hp if hasattr(player, "current_hp") else 0
             max_hp = player.max_hp if hasattr(player, "max_hp") else 4
             return current_hp < max_hp
 
-        # 距离检查
         if card_name == "顺手牵羊":
             return self._has_target_in_range(player, game_state, 1)
 

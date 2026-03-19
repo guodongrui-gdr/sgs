@@ -131,6 +131,8 @@ class SGSEnv(_BaseEnv):
         self._total_steps: int = 0
         self._turn_steps: int = 0
         self._max_turn_steps: int = 100
+        self._action_failures: int = 0
+        self._max_action_failures: int = 10
 
         self._winner: Optional[str] = None
 
@@ -378,11 +380,15 @@ class SGSEnv(_BaseEnv):
             if action >= self.action_encoder.card_dim:
                 return False
             mask = self._get_card_mask()
+            if mask.sum() == 0:
+                return True
             return mask[action] > 0
         elif self.current_step == 2:
             if action >= self.action_encoder.target_dim:
                 return False
             mask = self._get_target_mask()
+            if mask.sum() == 0:
+                return True
             return mask[action] > 0
         return False
 
@@ -413,6 +419,11 @@ class SGSEnv(_BaseEnv):
 
         elif self.current_step == 1:
             if self.pending_action:
+                card_mask = self._get_card_mask()
+                if card_mask.sum() == 0:
+                    self._execute_end_turn()
+                    return
+
                 self.pending_action.card_idx = int(action)
 
                 player = self.players[self.current_player_idx]
@@ -444,9 +455,24 @@ class SGSEnv(_BaseEnv):
                 logger.info(
                     f"Step 2: executing skill {self.pending_action.card_idx} on target {action}"
                 )
-                self._execute_action(self.pending_action)
-                self.current_step = 0
-                self.pending_action = None
+                action_executed = self._execute_action(self.pending_action)
+                if action_executed:
+                    self.current_step = 0
+                    self.pending_action = None
+                    self._action_failures = 0
+                else:
+                    self._action_failures += 1
+                    if self._action_failures >= self._max_action_failures:
+                        logger.warning(
+                            f"Too many action failures ({self._action_failures}), forcing end turn"
+                        )
+                        self._execute_end_turn()
+                    else:
+                        self.current_step = 1
+                        self.pending_action.target_idx = None
+                        logger.warning(
+                            f"Skill execution failed ({self._action_failures}/{self._max_action_failures}), returning to skill selection"
+                        )
 
     def _execute_action(self, action: HierarchicalAction):
         player = self.players[self.current_player_idx]
@@ -505,15 +531,20 @@ class SGSEnv(_BaseEnv):
                 tao_cards = [c for c in player.hand_cards if c.name == "桃"]
                 if tao_cards and action.card_idx < len(tao_cards):
                     card = tao_cards[action.card_idx]
-                    player.hand_cards.remove(card)
-                    self.engine.discard_pile.append(card)
 
+                    target = None
                     if action.target_idx is not None:
                         target = self.players[action.target_idx]
-                        target.current_hp = min(target.current_hp + 1, target.max_hp)
 
-                    self._record_action(action, "桃")
-                    action_executed = True
+                    if target is None:
+                        target = player
+
+                    success = self.engine.use_card(player, card, target)
+                    if success:
+                        self._record_action(action, "桃")
+                        action_executed = True
+                    else:
+                        logger.warning(f"RESPOND_TAO failed: use_card returned False")
                 else:
                     logger.warning(f"RESPOND_TAO failed: no tao cards or invalid index")
 
@@ -524,14 +555,32 @@ class SGSEnv(_BaseEnv):
             if action.card_idx is not None and 0 <= action.card_idx < len(skills):
                 skill = skills[action.card_idx]
                 if isinstance(skill, ActiveSkill):
-                    logger.info(f"Using skill: {skill.name}")
-                    action_executed = True
+                    from engine.event import Event, EventType
+
+                    event = Event(
+                        type=EventType.SKILL_TRIGGERED,
+                        source=player,
+                        engine=self.engine,
+                    )
+                    if skill.can_activate(event, self.engine):
+                        result = skill.execute(event, self.engine)
+                        if result is not None:
+                            logger.info(f"Using skill: {skill.name}")
+                            action_executed = True
+                        else:
+                            logger.warning(
+                                f"Skill {skill.name} execution returned None"
+                            )
+                    else:
+                        logger.warning(f"Skill {skill.name} cannot be activated")
                 else:
                     logger.warning(f"Cannot actively use passive skill: {skill.name}")
             else:
                 logger.warning(
                     f"USE_SKILL failed: skill_idx={action.card_idx}, skills_count={len(skills)}"
                 )
+
+        return action_executed
 
     def _execute_end_turn(self):
         player = self.players[self.current_player_idx]
@@ -546,6 +595,7 @@ class SGSEnv(_BaseEnv):
         self.round_count = self.engine.round_num
         self.current_step = 0
         self._turn_steps = 0
+        self._action_failures = 0
         self._record_action(HierarchicalAction(ActionType.END_TURN), "end_turn")
 
         if self.engine.phase != GamePhase.GAME_OVER:
@@ -571,7 +621,8 @@ class SGSEnv(_BaseEnv):
             self._winner = self._determine_winner()
             return True
 
-        if self.round_count >= self.config.max_rounds:
+        if self.engine.round_num >= self.config.max_rounds:
+            self._winner = self._determine_winner()
             return True
 
         return False
@@ -688,7 +739,7 @@ class SGSEnv(_BaseEnv):
             game_state = self._get_game_state_dict()
 
             return self.action_mask_generator.generate_masks(
-                game_state, player, self.current_step, self.pending_action
+                game_state, player, self.engine, self.current_step, self.pending_action
             )
         else:
             ones_type = np.ones(self.action_encoder.action_type_dim, dtype=np.float32)
@@ -699,13 +750,15 @@ class SGSEnv(_BaseEnv):
     def _get_action_type_mask(self) -> np.ndarray:
         player = self.players[self.current_player_idx]
         game_state = self._get_game_state_dict()
-        return self.action_mask_generator._get_valid_action_types(game_state, player)
+        return self.action_mask_generator._get_valid_action_types(
+            game_state, player, self.engine
+        )
 
     def _get_card_mask(self) -> np.ndarray:
         player = self.players[self.current_player_idx]
         game_state = self._get_game_state_dict()
         return self.action_mask_generator._get_valid_cards(
-            game_state, player, self.pending_action
+            game_state, player, self.pending_action, self.engine
         )
 
     def _get_target_mask(self) -> np.ndarray:
@@ -775,18 +828,24 @@ class SGSEnv(_BaseEnv):
             mask = self._get_action_type_mask()
             result = np.zeros(action_dim, dtype=np.float32)
             result[: len(mask)] = mask
+            if mask.sum() == 0:
+                result[0] = 1.0
             return result
         elif self.current_step == 1:
             mask = self._get_card_mask()
             result = np.zeros(action_dim, dtype=np.float32)
             result[: len(mask)] = mask
+            if mask.sum() == 0:
+                result[0] = 1.0
             return result
         elif self.current_step == 2:
             mask = self._get_target_mask()
             result = np.zeros(action_dim, dtype=np.float32)
             result[: len(mask)] = mask
+            if mask.sum() == 0:
+                result[0] = 1.0
             return result
-        return np.zeros(action_dim, dtype=np.float32)
+        return np.ones(action_dim, dtype=np.float32)
 
 
 def make_env(config: Optional[SGSConfig] = None) -> SGSEnv:

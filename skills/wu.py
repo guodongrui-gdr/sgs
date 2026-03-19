@@ -17,11 +17,20 @@ class Zhiheng(ActiveSkill):
             trigger_events=[],
             description="出牌阶段限一次，你可以弃置任意数量的牌，然后摸等量的牌",
         )
+        self.max_uses_per_turn = 1
 
     def can_activate(self, event: Event, engine: "GameEngine") -> bool:
         if not self.player:
             return False
-        if self.player.zhiheng_used:
+        if not self.can_use():
+            return False
+        return len(self.player.hand_cards) > 0
+
+    def is_available(self, engine: "GameEngine") -> bool:
+        """检查制衡是否可用：需要有手牌且本回合未使用过"""
+        if not self.player:
+            return False
+        if not self.can_use():
             return False
         return len(self.player.hand_cards) > 0
 
@@ -61,7 +70,7 @@ class Zhiheng(ActiveSkill):
 
             drawn = engine.draw_cards(self.player, len(cards_to_discard))
             self.player.hand_cards.extend(drawn)
-            self.player.zhiheng_used = True
+            self.use()
             # print(f">>> 弃置了 {len(cards_to_discard)} 张牌，摸了 {len(drawn)} 张牌")
 
         return event
@@ -151,6 +160,13 @@ class Kurou(ActiveSkill):
             return False
         return self.player.current_hp > 0
 
+    def is_available(self, engine: "GameEngine") -> bool:
+        """检查苦肉是否可用：需要存活且有体力可以失去"""
+        if not self.player:
+            return False
+        # 苦肉可以失去1点体力，即使HP=1也可以使用（会进入濒死，可能摸到桃自救）
+        return self.player.current_hp > 0
+
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if not self.player:
             return event
@@ -193,13 +209,25 @@ class Fanjian(ActiveSkill):
             trigger_events=[],
             description="出牌阶段限一次，你可以展示一张手牌并交给一名其他角色，然后该角色选择一项：展示所有手牌，弃置所有与你展示的牌花色相同的牌；或失去1点体力",
         )
+        self.max_uses_per_turn = 1
 
     def can_activate(self, event: Event, engine: "GameEngine") -> bool:
         if not self.player:
             return False
-        if self.player.fanjian_used:
+        if not self.can_use():
             return False
         return len(self.player.hand_cards) > 0
+
+    def is_available(self, engine: "GameEngine") -> bool:
+        """检查反间是否可用：需要有手牌、本回合未使用、有其他存活角色"""
+        if not self.player:
+            return False
+        if not self.can_use():
+            return False
+        if len(self.player.hand_cards) == 0:
+            return False
+        others = [p for p in engine.players if p != self.player and p.is_alive]
+        return len(others) > 0
 
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if not self.player or not self.player.hand_cards:
@@ -270,7 +298,7 @@ class Fanjian(ActiveSkill):
                     engine.discard_pile.append(c)
                 # print(f"{target.commander_name} 弃置了 {len(same_color)} 张牌")
 
-        self.player.fanjian_used = True
+        self.use()
         return event
 
 
@@ -473,11 +501,12 @@ class Jieyin(ActiveSkill):
             trigger_events=[],
             description="出牌阶段限一次，你可以弃置两张手牌并选择一名男性角色，你与其各回复1点体力",
         )
+        self.max_uses_per_turn = 1
 
     def can_activate(self, event: Event, engine: "GameEngine") -> bool:
         if not self.player:
             return False
-        if self.player.jieyin_used:
+        if not self.can_use():
             return False
         if len(self.player.hand_cards) < 2:
             return False
@@ -486,6 +515,21 @@ class Jieyin(ActiveSkill):
             p
             for p in engine.players
             if p != self.player and p.is_alive and p.gender == "male"
+        ]
+        return len(males) > 0
+
+    def is_available(self, engine: "GameEngine") -> bool:
+        """检查结姻是否可用：需要至少2张手牌、本回合未使用、有男性角色"""
+        if not self.player:
+            return False
+        if not self.can_use():
+            return False
+        if len(self.player.hand_cards) < 2:
+            return False
+        males = [
+            p
+            for p in engine.players
+            if p != self.player and p.is_alive and getattr(p, "gender", "") == "male"
         ]
         return len(males) > 0
 
@@ -545,7 +589,7 @@ class Jieyin(ActiveSkill):
             if target.current_hp < target.max_hp:
                 target.current_hp += 1
 
-            self.player.jieyin_used = True
+            self.use()
             # print(
             #     f">>> {self.player.commander_name} 发动【结姻】，与 {target.commander_name} 各回复1点体力"
             # )
