@@ -9,6 +9,8 @@ from .action_encoder import (
 )
 from .reward import RewardSystem, RewardConfig, RewardCalculator, IdentityRelationship
 from .gym_wrapper import SGSEnv, SGSConfig, make_env, GYM_AVAILABLE
+from .rule_ai import RuleAI, RuleAIConfig, HeuristicAI
+from .rl_ai import RLAI, RLAIConfig, create_rl_ai
 from .multi_agent_env import (
     MultiAgentEnv,
     MultiAgentConfig,
@@ -41,6 +43,12 @@ __all__ = [
     "SGSConfig",
     "make_env",
     "GYM_AVAILABLE",
+    "RuleAI",
+    "RuleAIConfig",
+    "HeuristicAI",
+    "RLAI",
+    "RLAIConfig",
+    "create_rl_ai",
     "MultiAgentEnv",
     "MultiAgentConfig",
     "SelfPlayEnv",

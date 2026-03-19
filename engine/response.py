@@ -235,9 +235,9 @@ class CardResolver:
             judge_card = self.engine.deck.pop() if self.engine.deck else None
             if judge_card:
                 self.engine.discard_pile.append(judge_card)
-                # print(f"八卦阵判定: {judge_card}")
+                self.engine.log(f"八卦阵判定: {judge_card}")
                 if judge_card.color in ["红桃", "方块"]:
-                    # print("八卦阵生效，视为出闪!")
+                    self.engine.log(f"{target.commander_name} 的八卦阵生效，视为出闪!")
                     return False
 
         shan = self.response_system.ask_for_response(target, request)
@@ -245,7 +245,7 @@ class CardResolver:
         if shan:
             target.hand_cards.remove(shan)
             self.engine.discard_pile.append(shan)
-            # print(f"{target.commander_name} 打出了闪")
+            self.engine.log(f"{target.commander_name} 打出了闪，躲避了杀")
             return False
 
         actual_damage = damage
@@ -255,10 +255,10 @@ class CardResolver:
             and is_elemental
         ):
             actual_damage += 1
-            # print("藤甲使火焰伤害+1!")
+            self.engine.log(f"{target.commander_name} 穿着藤甲，火焰伤害+1!")
         if target.equipment.get("防具") and target.equipment["防具"].name == "白银狮子":
             actual_damage = max(1, actual_damage - 1)
-            # print("白银狮子使伤害-1!")
+            self.engine.log(f"{target.commander_name} 穿着白银狮子，伤害-1!")
 
         self.engine.deal_damage(source, target, card, actual_damage, is_elemental)
         return True

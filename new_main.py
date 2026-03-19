@@ -1,5 +1,6 @@
 import random
 import json
+import argparse
 from pathlib import Path
 
 from config import MIN_PLAYERS, MAX_PLAYERS, IDENTITY_CONFIG
@@ -11,6 +12,9 @@ import skills.wei
 import skills.shu
 import skills.wu
 import skills.qun
+
+from ai.rl_ai import RLAI, create_rl_ai
+from ai.rule_ai import RuleAI, RuleAIConfig
 
 
 def load_commanders():
@@ -154,7 +158,9 @@ def handle_card_play(engine: GameEngine, player: Player, card):
             print("体力已满，无法使用桃")
             return None
         engine.use_card(player, card, player)
-        print(f"恢复1点体力，当前体力: {current_hp_display(player)}")
+        for log_msg in engine.action_log:
+            print(f"  {log_msg}")
+        engine.action_log.clear()
         return None
 
     if card.name == "酒":
@@ -162,12 +168,14 @@ def handle_card_play(engine: GameEngine, player: Player, card):
             print("本回合已使用过酒")
             return None
         engine.use_card(player, card, player)
-        print("酒效果生效，下一张杀伤害+1")
+        print("  酒效果生效，下一张杀伤害+1")
         return None
 
     if card.name == "无中生有":
         engine.use_card(player, card, None)
-        print("摸了2张牌")
+        for log_msg in engine.action_log:
+            print(f"  {log_msg}")
+        engine.action_log.clear()
         return None
 
     if "杀" in card.name:
@@ -192,7 +200,9 @@ def handle_card_play(engine: GameEngine, player: Player, card):
                 target = targets[target_idx]
                 success = engine.use_card(player, card, target)
                 if success:
-                    print(f"对 {target.commander_name} 使用{card.name}")
+                    for log_msg in engine.action_log:
+                        print(f"  {log_msg}")
+                    engine.action_log.clear()
                 return None
         except ValueError:
             print("无效选择")
@@ -211,6 +221,9 @@ def handle_card_play(engine: GameEngine, player: Player, card):
             if 0 <= target_idx < len(targets):
                 target = targets[target_idx]
                 engine.use_card(player, card, target)
+                for log_msg in engine.action_log:
+                    print(f"  {log_msg}")
+                engine.action_log.clear()
                 return None
         except ValueError:
             pass
@@ -218,12 +231,16 @@ def handle_card_play(engine: GameEngine, player: Player, card):
 
     if card.name == "南蛮入侵":
         engine.use_card(player, card, None)
-        print("使用南蛮入侵!")
+        for log_msg in engine.action_log:
+            print(f"  {log_msg}")
+        engine.action_log.clear()
         return None
 
     if card.name == "万箭齐发":
         engine.use_card(player, card, None)
-        print("使用万箭齐发!")
+        for log_msg in engine.action_log:
+            print(f"  {log_msg}")
+        engine.action_log.clear()
         return None
 
     if card.name == "火攻":
@@ -241,6 +258,9 @@ def handle_card_play(engine: GameEngine, player: Player, card):
             if 0 <= target_idx < len(targets):
                 target = targets[target_idx]
                 engine.use_card(player, card, target)
+                for log_msg in engine.action_log:
+                    print(f"  {log_msg}")
+                engine.action_log.clear()
                 return None
         except ValueError:
             pass
@@ -270,6 +290,9 @@ def handle_card_play(engine: GameEngine, player: Player, card):
             if 0 <= target_idx < len(targets):
                 target = targets[target_idx]
                 engine.use_card(player, card, target)
+                for log_msg in engine.action_log:
+                    print(f"  {log_msg}")
+                engine.action_log.clear()
                 return None
         except ValueError:
             pass
@@ -286,7 +309,7 @@ def handle_card_play(engine: GameEngine, player: Player, card):
                 engine.discard_pile.append(card)
                 drawn = engine.draw_cards(player, 1)
                 player.hand_cards.extend(drawn)
-                print("重铸成功，摸了1张牌")
+                print("  重铸成功，摸了1张牌")
                 return None
         except ValueError:
             pass
@@ -305,7 +328,7 @@ def handle_card_play(engine: GameEngine, player: Player, card):
                 for t in selected_targets[:2]:
                     t.is_chained = not t.is_chained
                     status = "连环" if t.is_chained else "重置"
-                    print(f"{t.commander_name} {status}")
+                    print(f"  {t.commander_name} {status}")
                 player.hand_cards.remove(card)
                 engine.discard_pile.append(card)
             return None
@@ -337,6 +360,7 @@ def handle_card_play(engine: GameEngine, player: Player, card):
             if 0 <= target_idx < len(targets):
                 target = targets[target_idx]
                 engine.use_card(player, card, target)
+                print(f"  对 {target.commander_name} 使用乐不思蜀")
                 return None
         except ValueError:
             pass
@@ -359,6 +383,7 @@ def handle_card_play(engine: GameEngine, player: Player, card):
             if 0 <= target_idx < len(targets):
                 target = targets[target_idx]
                 engine.use_card(player, card, target)
+                print(f"  对 {target.commander_name} 使用兵粮寸断")
                 return None
         except ValueError:
             pass
@@ -366,27 +391,32 @@ def handle_card_play(engine: GameEngine, player: Player, card):
 
     if card.name == "闪电":
         engine.use_card(player, card, None)
-        print("在自己判定区放置闪电")
+        print("  在自己判定区放置闪电")
         return None
 
     if card.card_type == "WeaponCard":
         engine.use_card(player, card, None)
+        print(f"  装备 {card.name}")
         return None
 
     if card.card_type == "ArmourCard":
         engine.use_card(player, card, None)
+        print(f"  装备 {card.name}")
         return None
 
     if card.card_type == "AttackHorseCard":
         engine.use_card(player, card, None)
+        print(f"  装备 {card.name}")
         return None
 
     if card.card_type == "DefenseHorseCard":
         engine.use_card(player, card, None)
+        print(f"  装备 {card.name}")
         return None
 
     if card.card_type == "TreasureCard":
         engine.use_card(player, card, None)
+        print(f"  装备 {card.name}")
         return None
 
     print(f"暂不支持此卡牌: {card.name} ({card.card_type})")
@@ -440,7 +470,7 @@ def has_cards(player: Player) -> bool:
     return False
 
 
-def ai_turn(engine: GameEngine, player: Player):
+def ai_turn(engine: GameEngine, player: Player, rl_ai: RLAI = None):
     print(f"\nAI回合: {player.commander_name}")
 
     if player.judge_area:
@@ -449,68 +479,167 @@ def ai_turn(engine: GameEngine, player: Player):
     used_sha = False
     cards_to_use = player.hand_cards.copy()
 
-    for card in cards_to_use:
-        if not player.is_alive:
-            break
+    engine.action_log.clear()
 
-        if card.name == "桃" and player.current_hp < player.max_hp:
-            engine.use_card(player, card, player)
-            print(f"  使用桃，恢复体力")
+    if rl_ai is not None:
+        max_actions = 50
+        action_count = 0
 
-        elif card.name == "酒" and player.jiu_count < 1:
-            engine.use_card(player, card, player)
-            print(f"  使用酒")
+        while action_count < max_actions:
+            if not player.is_alive:
+                break
 
-        elif card.name == "无中生有":
-            engine.use_card(player, card, None)
-            print(f"  使用无中生有")
+            card, target = rl_ai.select_action(engine, player)
 
-        elif "杀" in card.name and not used_sha and player.can_use_sha():
-            targets = get_sha_targets(engine, player)
-            if targets:
-                min_hp_target = min(targets, key=lambda t: t.current_hp)
-                engine.use_card(player, card, min_hp_target)
-                used_sha = True
-                print(f"  对 {min_hp_target.commander_name} 使用杀")
+            if card is None:
+                print("  结束回合")
+                break
 
-        elif card.name == "南蛮入侵":
-            engine.use_card(player, card, None)
-            print(f"  使用南蛮入侵")
+            if card in player.hand_cards:
+                if "杀" in card.name:
+                    if not used_sha and player.can_use_sha():
+                        if target:
+                            engine.use_card(player, card, target)
+                            used_sha = True
+                            for log_msg in engine.action_log:
+                                print(f"    {log_msg}")
+                            engine.action_log.clear()
+                        else:
+                            targets = get_sha_targets(engine, player)
+                            if targets:
+                                min_hp_target = min(targets, key=lambda t: t.current_hp)
+                                engine.use_card(player, card, min_hp_target)
+                                used_sha = True
+                                for log_msg in engine.action_log:
+                                    print(f"    {log_msg}")
+                                engine.action_log.clear()
+                    else:
+                        print(f"  跳过 {card.name}")
+                elif card.name == "桃" and player.current_hp < player.max_hp:
+                    engine.use_card(player, card, player)
+                    for log_msg in engine.action_log:
+                        print(f"    {log_msg}")
+                    engine.action_log.clear()
+                elif card.name == "酒" and player.jiu_count < 1:
+                    engine.use_card(player, card, player)
+                    for log_msg in engine.action_log:
+                        print(f"    {log_msg}")
+                    engine.action_log.clear()
+                elif card.name == "无中生有":
+                    engine.use_card(player, card, None)
+                    for log_msg in engine.action_log:
+                        print(f"    {log_msg}")
+                    engine.action_log.clear()
+                elif card.name in ["南蛮入侵", "万箭齐发"]:
+                    engine.use_card(player, card, None)
+                    for log_msg in engine.action_log:
+                        print(f"    {log_msg}")
+                    engine.action_log.clear()
+                elif card.name in ["过河拆桥", "顺手牵羊"]:
+                    if target:
+                        engine.use_card(player, card, target)
+                        for log_msg in engine.action_log:
+                            print(f"    {log_msg}")
+                        engine.action_log.clear()
+                elif hasattr(card, "card_type") and card.card_type in [
+                    "WeaponCard",
+                    "ArmourCard",
+                    "AttackHorseCard",
+                    "DefenseHorseCard",
+                ]:
+                    engine.use_card(player, card, None)
+                    print(f"    装备 {card.name}")
+                else:
+                    if target:
+                        engine.use_card(player, card, target)
+                        for log_msg in engine.action_log:
+                            print(f"    {log_msg}")
+                        engine.action_log.clear()
+                    else:
+                        engine.use_card(player, card, None)
+                        for log_msg in engine.action_log:
+                            print(f"    {log_msg}")
+                        engine.action_log.clear()
 
-        elif card.name == "万箭齐发":
-            engine.use_card(player, card, None)
-            print(f"  使用万箭齐发")
+            action_count += 1
+            cards_to_use = player.hand_cards.copy()
+    else:
+        for card in cards_to_use:
+            if not player.is_alive:
+                break
 
-        elif card.name in ["过河拆桥", "顺手牵羊"]:
-            targets = [
-                p for p in engine.players if p != player and p.is_alive and has_cards(p)
-            ]
-            if card.name == "顺手牵羊":
-                targets = [t for t in targets if calculate_distance(player, t) <= 1]
-            if targets:
-                target = random.choice(targets)
-                engine.use_card(player, card, target)
-                print(f"  对 {target.commander_name} 使用{card.name}")
+            if card.name == "桃" and player.current_hp < player.max_hp:
+                engine.use_card(player, card, player)
+                for log_msg in engine.action_log:
+                    print(f"    {log_msg}")
+                engine.action_log.clear()
 
-        elif card.card_type in [
-            "WeaponCard",
-            "ArmourCard",
-            "AttackHorseCard",
-            "DefenseHorseCard",
-        ]:
-            engine.use_card(player, card, None)
-            print(f"  装备 {card.name}")
+            elif card.name == "酒" and player.jiu_count < 1:
+                engine.use_card(player, card, player)
+                print(f"    使用酒")
+
+            elif card.name == "无中生有":
+                engine.use_card(player, card, None)
+                for log_msg in engine.action_log:
+                    print(f"    {log_msg}")
+                engine.action_log.clear()
+
+            elif "杀" in card.name and not used_sha and player.can_use_sha():
+                targets = get_sha_targets(engine, player)
+                if targets:
+                    min_hp_target = min(targets, key=lambda t: t.current_hp)
+                    engine.use_card(player, card, min_hp_target)
+                    used_sha = True
+                    for log_msg in engine.action_log:
+                        print(f"    {log_msg}")
+                    engine.action_log.clear()
+
+            elif card.name == "南蛮入侵":
+                engine.use_card(player, card, None)
+                for log_msg in engine.action_log:
+                    print(f"    {log_msg}")
+                engine.action_log.clear()
+
+            elif card.name == "万箭齐发":
+                engine.use_card(player, card, None)
+                for log_msg in engine.action_log:
+                    print(f"    {log_msg}")
+                engine.action_log.clear()
+
+            elif card.name in ["过河拆桥", "顺手牵羊"]:
+                targets = [
+                    p
+                    for p in engine.players
+                    if p != player and p.is_alive and has_cards(p)
+                ]
+                if card.name == "顺手牵羊":
+                    targets = [t for t in targets if calculate_distance(player, t) <= 1]
+                if targets:
+                    target = random.choice(targets)
+                    engine.use_card(player, card, target)
+                    for log_msg in engine.action_log:
+                        print(f"    {log_msg}")
+                    engine.action_log.clear()
+
+            elif card.card_type in [
+                "WeaponCard",
+                "ArmourCard",
+                "AttackHorseCard",
+                "DefenseHorseCard",
+            ]:
+                engine.use_card(player, card, None)
+                print(f"    装备 {card.name}")
 
     while len(player.hand_cards) > player.hand_limit:
         card = random.choice(player.hand_cards)
         player.hand_cards.remove(card)
         engine.discard_pile.append(card)
-        print(f"  弃置 {card}")
+        print(f"    弃置 {card}")
 
     player.reset_turn_state()
 
 
-def game_loop(engine: GameEngine):
+def game_loop(engine: GameEngine, rl_ai: RLAI = None):
     print("\n游戏开始!")
 
     while engine.phase.value != "game_over":
@@ -540,7 +669,7 @@ def game_loop(engine: GameEngine):
             if current.is_human:
                 result = human_turn(engine, current)
             else:
-                ai_turn(engine, current)
+                ai_turn(engine, current, rl_ai)
 
         while len(current.hand_cards) > current.hand_limit:
             if current.is_human:
@@ -571,27 +700,70 @@ def game_loop(engine: GameEngine):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="三国杀 - 人机对战版")
+    parser.add_argument(
+        "--ai-type",
+        type=str,
+        default="random",
+        choices=["random", "rule", "rl"],
+        help="AI类型: random(随机), rule(规则), rl(强化学习)",
+    )
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        default=None,
+        help="RL模型文件路径 (仅当 --ai-type=rl 时需要)",
+    )
+    parser.add_argument("--player-num", type=int, default=2, help="玩家数量 (默认: 2)")
+
+    args = parser.parse_args()
+
     print("=" * 50)
     print("三国杀 - 人机对战版")
     print("=" * 50)
 
     print(f"\n支持 {MIN_PLAYERS}-{MAX_PLAYERS} 人游戏")
 
-    try:
-        player_num = int(input("请输入玩家数量 (默认2): ") or "2")
-    except ValueError:
-        player_num = 2
-
+    player_num = args.player_num
     player_num = max(MIN_PLAYERS, min(MAX_PLAYERS, player_num))
 
     print(f"\n游戏人数: {player_num}")
+    print(f"AI类型: {args.ai_type}")
     print("你是1号位玩家\n")
+
+    rl_ai = None
+    if args.ai_type == "rl":
+        if not args.model_path:
+            print("错误: 使用RL AI需要指定 --model-path 参数")
+            print("\n可用的模型:")
+            train_logs = Path(__file__).parent / "train" / "logs"
+            if train_logs.exists():
+                for log_dir in sorted(train_logs.iterdir(), reverse=True):
+                    if log_dir.is_dir():
+                        model_file = log_dir / "final_model.zip"
+                        if model_file.exists():
+                            print(f"  {model_file}")
+            return
+
+        try:
+            print(f"\n正在加载模型: {args.model_path}")
+            rl_ai = create_rl_ai(
+                model_path=args.model_path,
+                player_num=player_num,
+                use_masking=True,
+                deterministic=True,
+            )
+            print("模型加载成功!\n")
+        except Exception as e:
+            print(f"模型加载失败: {e}")
+            print("回退到随机AI")
+            args.ai_type = "random"
 
     engine = setup_game(player_num, human_player_idx=0)
 
     print("\n武将分配:")
     for p in engine.players:
-        human_mark = " [玩家]" if p.is_human else " [AI]"
+        human_mark = " [玩家]" if p.is_human else f" [{args.ai_type.upper()} AI]"
         print(f"  {p.idx}号位: {p.commander_name} ({p.nation}){human_mark}")
 
     print("\n身份分配:")
@@ -601,7 +773,7 @@ def main():
 
     input("\n按回车开始游戏...")
 
-    game_loop(engine)
+    game_loop(engine, rl_ai)
 
 
 if __name__ == "__main__":

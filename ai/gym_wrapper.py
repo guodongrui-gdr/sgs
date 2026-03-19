@@ -64,6 +64,7 @@ class SGSConfig:
     max_rounds: int = 100
     use_action_mask: bool = True
     use_shaping: bool = False
+    other_player_policy: str = "rule"
 
     state_config: Optional[EncodingConfig] = None
     action_config: Optional[ActionConfig] = None
@@ -140,6 +141,14 @@ class SGSEnv(_BaseEnv):
         self._prev_alive: Dict[int, bool] = {}
         self._pending_rewards: float = 0.0
 
+        self._rule_ai = None
+        if self.config.other_player_policy == "rule":
+            from ai.rule_ai import RuleAI, RuleAIConfig
+
+            self._rule_ai = RuleAI(RuleAIConfig())
+
+        self.controlled_player_idx: int = 0
+
     def _setup_spaces(self):
         state_dim = self.state_encoder.get_state_dim(self.config.player_num)
 
@@ -193,6 +202,8 @@ class SGSEnv(_BaseEnv):
 
         self._run_until_player_turn()
 
+        self.controlled_player_idx = self.current_player_idx
+
         obs = self._get_observation()
         info = self._get_info()
 
@@ -207,7 +218,7 @@ class SGSEnv(_BaseEnv):
             self._prev_alive[i] = p.is_alive
 
     def _run_until_player_turn(self):
-        """运行游戏直到当前玩家可以行动"""
+        """运行游戏直到受控玩家可以行动"""
         max_iterations = 200
         start_time = time.time()
         for iteration in range(max_iterations):
@@ -248,19 +259,173 @@ class SGSEnv(_BaseEnv):
                 drawn = self.engine.draw_cards(current, 2)
                 current.hand_cards.extend(drawn)
 
-            if not judge_result.get("skip_play", False):
+            if judge_result.get("skip_play", False):
+                self.engine.next_turn()
+                self.current_player_idx = self.engine.current_player_idx
+                self.round_count = self.engine.round_num
+                continue
+
+            if (
+                self._rule_ai is not None
+                and self.current_player_idx != self.controlled_player_idx
+            ):
+                self.engine.phase = GamePhase.PLAY_PHASE
+                self._execute_ai_turn(current)
+                self._do_end_turn(current)
+                self.engine.next_turn()
+                self.current_player_idx = self.engine.current_player_idx
+                self.round_count = self.engine.round_num
+            else:
                 self.engine.phase = GamePhase.PLAY_PHASE
                 break
-
-            self.engine.next_turn()
-            self.current_player_idx = self.engine.current_player_idx
-            self.round_count = self.engine.round_num
 
         if iteration >= max_iterations - 1:
             logger.warning(
                 f"_run_until_player_turn reached max_iterations={max_iterations}"
             )
             self.engine.phase = GamePhase.GAME_OVER
+
+    def _execute_ai_turn(self, player: Player, max_actions: int = 20) -> None:
+        """使用 AI 执行一个玩家的回合"""
+        if self._rule_ai is None:
+            self._do_end_turn(player)
+            return
+
+        game_state = self._get_game_state_dict()
+        actions_taken = 0
+
+        while actions_taken < max_actions:
+            if self.engine.phase == GamePhase.GAME_OVER:
+                break
+
+            type_mask, card_mask, target_mask = (
+                self.action_mask_generator.generate_masks(
+                    game_state, player, self.engine, 0, None
+                )
+            )
+
+            valid_types = [i for i, m in enumerate(type_mask) if m > 0]
+            if not valid_types or ActionType.END_TURN in valid_types:
+                self._do_end_turn(player)
+                break
+
+            action_type = self._rule_ai.select_action(
+                player, game_state, (type_mask, card_mask, target_mask)
+            )
+
+            if action_type == ActionType.END_TURN:
+                self._do_end_turn(player)
+                break
+
+            if action_type == ActionType.USE_CARD:
+                card_idx = self._rule_ai.select_card(player, game_state, card_mask)
+                if card_idx < 0:
+                    self._do_end_turn(player)
+                    break
+
+                card = (
+                    player.hand_cards[card_idx]
+                    if card_idx < len(player.hand_cards)
+                    else None
+                )
+                needs_target = self.action_encoder.needs_target(action_type, card)
+
+                if needs_target:
+                    _, _, new_target_mask = self.action_mask_generator.generate_masks(
+                        game_state,
+                        player,
+                        self.engine,
+                        1,
+                        HierarchicalAction(action_type=action_type, card_idx=card_idx),
+                    )
+                    target_idx = self._rule_ai.select_target(
+                        player, game_state, new_target_mask.tolist()
+                    )
+                    self._execute_card_action(player, card_idx, target_idx)
+                else:
+                    self._execute_card_action(player, card_idx, None)
+
+                actions_taken += 1
+
+            elif action_type == ActionType.USE_SKILL:
+                skills = getattr(player, "skills", [])
+                if not skills:
+                    self._do_end_turn(player)
+                    break
+
+                skill_idx = 0
+                for i, skill in enumerate(skills):
+                    if i < len(card_mask) and card_mask[i] > 0:
+                        skill_idx = i
+                        break
+
+                _, _, new_target_mask = self.action_mask_generator.generate_masks(
+                    game_state,
+                    player,
+                    self.engine,
+                    1,
+                    HierarchicalAction(action_type=action_type, card_idx=skill_idx),
+                )
+                target_idx = self._rule_ai.select_target(
+                    player, game_state, new_target_mask.tolist()
+                )
+                self._execute_skill_action(player, skill_idx, target_idx)
+                actions_taken += 1
+
+            else:
+                self._do_end_turn(player)
+                break
+
+            game_state = self._get_game_state_dict()
+
+    def _do_end_turn(self, player: Player) -> None:
+        """执行回合结束（弃牌）"""
+        hand_limit = max(0, getattr(player, "hand_limit", player.current_hp))
+        while len(player.hand_cards) > hand_limit:
+            if player.hand_cards:
+                card = player.hand_cards.pop()
+                self.engine.discard_pile.append(card)
+
+    def _execute_card_action(
+        self, player: Player, card_idx: int, target_idx: int
+    ) -> bool:
+        """执行卡牌动作"""
+        if card_idx >= len(player.hand_cards):
+            return False
+
+        card = player.hand_cards[card_idx]
+        target = None
+        if target_idx is not None and 0 <= target_idx < len(self.players):
+            target = self.players[target_idx]
+
+        try:
+            result = self.engine.use_card(player, card, target)
+            return result
+        except Exception as e:
+            logger.debug(f"AI card action failed: {e}")
+            return False
+
+    def _execute_skill_action(
+        self, player: Player, skill_idx: int, target_idx: int
+    ) -> bool:
+        """执行技能动作"""
+        skills = getattr(player, "skills", [])
+        if skill_idx >= len(skills):
+            return False
+
+        skill = skills[skill_idx]
+        target = None
+        if target_idx is not None and 0 <= target_idx < len(self.players):
+            target = self.players[target_idx]
+
+        try:
+            if hasattr(skill, "execute"):
+                result = skill.execute(self.engine, player, target)
+                return True
+            return False
+        except Exception as e:
+            logger.debug(f"AI skill action failed: {e}")
+            return False
 
     def _setup_game(self):
         from card.factory import CardFactory

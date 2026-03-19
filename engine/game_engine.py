@@ -34,6 +34,8 @@ class GameEngine:
         self.round_num = 1
         self.phase = GamePhase.WAITING
 
+        self.action_log: List[str] = []
+
         self._load_commanders()
         self._load_cards()
 
@@ -41,6 +43,10 @@ class GameEngine:
         self.card_resolver = CardResolver(self)
         self.judge_system = JudgeSystem(self)
         self.delayed_trick_handler = DelayedTrickHandler(self)
+
+    def log(self, message: str):
+        self.action_log.append(message)
+        logger.info(message)
 
     def _load_commanders(self):
         config_path = Path(__file__).parent.parent / "data" / "commanders.json"
@@ -158,37 +164,49 @@ class GameEngine:
         if card.name == "桃":
             if player.current_hp < player.max_hp:
                 player.current_hp += 1
+                self.log(
+                    f"{player.commander_name} 使用桃，恢复1点体力，当前体力: {player.current_hp}/{player.max_hp}"
+                )
             self._move_to_discard(card)
 
         elif card.name == "无中生有":
             drawn = self.draw_cards(player, 2)
             player.hand_cards.extend(drawn)
+            self.log(f"{player.commander_name} 使用无中生有，摸了2张牌")
             self._move_to_discard(card)
 
         elif "杀" in card.name and target:
             damage = 1 + player.jiu_effect
             is_elemental = "火" in card.name or "雷" in card.name
+            self.log(
+                f"{player.commander_name} 对 {target.commander_name} 使用{card.name}"
+            )
             self.card_resolver.resolve_sha(player, target, card)
             player.jiu_effect = 0
             self._move_to_discard(card)
 
         elif card.name == "决斗" and target:
+            self.log(f"{player.commander_name} 对 {target.commander_name} 使用决斗")
             self.card_resolver.resolve_juedou(player, target)
             self._move_to_discard(card)
 
         elif card.name == "南蛮入侵":
+            self.log(f"{player.commander_name} 使用南蛮入侵")
             self.card_resolver.resolve_namaninru(player)
             self._move_to_discard(card)
 
         elif card.name == "万箭齐发":
+            self.log(f"{player.commander_name} 使用万箭齐发")
             self.card_resolver.resolve_wanjianqifa(player)
             self._move_to_discard(card)
 
         elif card.name == "火攻" and target:
+            self.log(f"{player.commander_name} 对 {target.commander_name} 使用火攻")
             self.card_resolver.resolve_huogong(player, target)
             self._move_to_discard(card)
 
         elif card.name == "过河拆桥" and target:
+            self.log(f"{player.commander_name} 对 {target.commander_name} 使用过河拆桥")
             self._resolve_chaiqiao(player, target)
             self._move_to_discard(card)
 
@@ -494,6 +512,15 @@ class GameEngine:
         )
 
         target.current_hp -= actual_damage
+
+        if source:
+            self.log(
+                f"{target.commander_name} 受到 {actual_damage} 点伤害（来自{source.commander_name}），当前体力: {target.current_hp}/{target.max_hp}"
+            )
+        else:
+            self.log(
+                f"{target.commander_name} 受到 {actual_damage} 点伤害，当前体力: {target.current_hp}/{target.max_hp}"
+            )
 
         self._emit_event(EventType.HP_CHANGED, target=target, value=-actual_damage)
 

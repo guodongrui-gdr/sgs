@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from engine.game_engine import GameEngine
 from player.player import Player
-from cards.card import Card
+from card.base import Card
 from ai.action_encoder import ActionEncoder, ActionConfig, HierarchicalAction
 from ai.action_encoder import ActionType
 
