@@ -754,7 +754,7 @@ class StateEncoder:
 
         return np.concatenate(encoded_history)
 
-    def get_state_dim(self) -> int:
+    def get_state_dim(self, player_num: int = 5) -> int:
         """获取状态向量维度"""
         return len(
             self.encode(
@@ -767,7 +767,7 @@ class StateEncoder:
                             "skills": [],
                         }
                     ]
-                    * 5
+                    * player_num
                 },
                 0,
             )

@@ -9,6 +9,7 @@ Gym环境包装器 - 将三国杀游戏包装为Gymnasium环境
 """
 
 import numpy as np
+import time
 from typing import Dict, List, Optional, Tuple, Any, Union
 from dataclasses import dataclass
 from enum import IntEnum
@@ -127,6 +128,9 @@ class SGSEnv(_BaseEnv):
         self.pending_action: Optional[HierarchicalAction] = None
         self.round_count: int = 0
         self.action_history: List[Dict] = []
+        self._total_steps: int = 0
+        self._turn_steps: int = 0
+        self._max_turn_steps: int = 100
 
         self._winner: Optional[str] = None
 
@@ -135,7 +139,7 @@ class SGSEnv(_BaseEnv):
         self._pending_rewards: float = 0.0
 
     def _setup_spaces(self):
-        state_dim = self.state_encoder.get_state_dim()
+        state_dim = self.state_encoder.get_state_dim(self.config.player_num)
 
         self.observation_space = spaces.Dict(
             {
@@ -203,7 +207,14 @@ class SGSEnv(_BaseEnv):
     def _run_until_player_turn(self):
         """运行游戏直到当前玩家可以行动"""
         max_iterations = 200
+        start_time = time.time()
         for iteration in range(max_iterations):
+            if iteration > 0 and iteration % 50 == 0:
+                elapsed = time.time() - start_time
+                logger.warning(
+                    f"_run_until_player_turn iteration {iteration}, elapsed={elapsed:.1f}s, phase={self.engine.phase}, player_idx={self.current_player_idx}"
+                )
+
             logger.debug(f"_run_until_player_turn iteration {iteration}")
             if self.engine.phase == GamePhase.GAME_OVER:
                 break
@@ -298,6 +309,29 @@ class SGSEnv(_BaseEnv):
             self.players.append(player)
 
     def step(self, action: int) -> Tuple[Dict, float, bool, bool, Dict]:
+        self._total_steps += 1
+        self._turn_steps += 1
+
+        if self._turn_steps > self._max_turn_steps:
+            logger.warning(
+                f"Turn exceeded max steps ({self._max_turn_steps}), forcing end turn"
+            )
+            self._execute_end_turn()
+            self._turn_steps = 0
+
+        if self._turn_steps % 50 == 0 and self._turn_steps > 0:
+            pending_info = (
+                self.pending_action.to_dict() if self.pending_action else "None"
+            )
+            logger.warning(
+                f"Turn steps: {self._turn_steps}, current_step={self.current_step}, action={action}, player={self.current_player_idx}, pending={pending_info}"
+            )
+
+        if self._total_steps % 1000 == 0:
+            logger.info(
+                f"Env step {self._total_steps}, round={self.round_count}, player={self.current_player_idx}, phase={self.engine.phase if self.engine else 'None'}, turn_steps={self._turn_steps}"
+            )
+
         action = int(action)
         truncated = False
 
@@ -307,11 +341,22 @@ class SGSEnv(_BaseEnv):
             obs = self._get_observation()
             return obs, -0.1, False, True, {"error": "Invalid action"}
 
+        last_action_type = (
+            self.pending_action.action_type if self.pending_action else -1
+        )
+
         self._process_action(action)
 
         done = self._check_done()
 
         reward = self._calculate_reward()
+
+        if (
+            self._turn_steps > 5
+            and self.pending_action is not None
+            and last_action_type == self.pending_action.action_type
+        ):
+            reward -= 0.01
 
         obs = self._get_observation()
         info = self._get_info()
@@ -376,6 +421,12 @@ class SGSEnv(_BaseEnv):
                     hand_cards[int(action)] if int(action) < len(hand_cards) else None
                 )
 
+                if card is None:
+                    logger.warning(
+                        f"Step=1: action={action} but card is None, hand_size={len(hand_cards)}, "
+                        f"action_type={self.pending_action.action_type}"
+                    )
+
                 needs_target = self.action_encoder.needs_target(
                     self.pending_action.action_type, card
                 )
@@ -390,12 +441,16 @@ class SGSEnv(_BaseEnv):
         elif self.current_step == 2:
             if self.pending_action:
                 self.pending_action.target_idx = action
+                logger.info(
+                    f"Step 2: executing skill {self.pending_action.card_idx} on target {action}"
+                )
                 self._execute_action(self.pending_action)
                 self.current_step = 0
                 self.pending_action = None
 
     def _execute_action(self, action: HierarchicalAction):
         player = self.players[self.current_player_idx]
+        action_executed = False
 
         if action.action_type == ActionType.USE_CARD:
             if action.card_idx is not None and action.card_idx < len(player.hand_cards):
@@ -406,8 +461,20 @@ class SGSEnv(_BaseEnv):
                     if 0 <= target_idx < len(self.players):
                         target = self.players[target_idx]
 
-                self.engine.use_card(player, card, target)
-                self._record_action(action, card.name if card else "")
+                success = self.engine.use_card(player, card, target)
+                if success:
+                    self._record_action(action, card.name if card else "")
+                    action_executed = True
+                else:
+                    logger.warning(
+                        f"USE_CARD failed: card={card.name}, player={player.idx}, "
+                        f"sha_count={player.sha_count}, hand_size={len(player.hand_cards)}, "
+                        f"card_in_hand={card in player.hand_cards}"
+                    )
+            else:
+                logger.warning(
+                    f"USE_CARD failed: card_idx={action.card_idx}, hand_size={len(player.hand_cards)}"
+                )
 
         elif action.action_type == ActionType.DISCARD:
             if action.card_idx is not None and action.card_idx < len(player.hand_cards):
@@ -446,6 +513,25 @@ class SGSEnv(_BaseEnv):
                         target.current_hp = min(target.current_hp + 1, target.max_hp)
 
                     self._record_action(action, "桃")
+                    action_executed = True
+                else:
+                    logger.warning(f"RESPOND_TAO failed: no tao cards or invalid index")
+
+        elif action.action_type == ActionType.USE_SKILL:
+            from skills.base import ActiveSkill
+
+            skills = player.skills
+            if action.card_idx is not None and 0 <= action.card_idx < len(skills):
+                skill = skills[action.card_idx]
+                if isinstance(skill, ActiveSkill):
+                    logger.info(f"Using skill: {skill.name}")
+                    action_executed = True
+                else:
+                    logger.warning(f"Cannot actively use passive skill: {skill.name}")
+            else:
+                logger.warning(
+                    f"USE_SKILL failed: skill_idx={action.card_idx}, skills_count={len(skills)}"
+                )
 
     def _execute_end_turn(self):
         player = self.players[self.current_player_idx]
@@ -459,6 +545,7 @@ class SGSEnv(_BaseEnv):
         self.current_player_idx = self.engine.current_player_idx
         self.round_count = self.engine.round_num
         self.current_step = 0
+        self._turn_steps = 0
         self._record_action(HierarchicalAction(ActionType.END_TURN), "end_turn")
 
         if self.engine.phase != GamePhase.GAME_OVER:
@@ -581,7 +668,7 @@ class SGSEnv(_BaseEnv):
             "action_mask_type": mask_type,
             "action_mask_card": mask_card,
             "action_mask_target": mask_target,
-            "current_step": np.array([self.current_step], dtype=np.int32),
+            "current_step": self.current_step,
         }
 
     def _get_game_state_dict(self) -> Dict:

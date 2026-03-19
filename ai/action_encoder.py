@@ -333,8 +333,12 @@ class ActionMaskGenerator:
                     masks[i] = 1.0
 
         elif action_type == ActionType.USE_SKILL:
+            from skills.base import ActiveSkill
+
             skills = self._get_attr(player, "skills", [])
             for i, skill in enumerate(skills[: self.encoder.card_dim]):
+                if not isinstance(skill, ActiveSkill):
+                    continue
                 targets = self._get_skill_targets(
                     player, skill, game_state.get("players", [])
                 )
@@ -390,9 +394,13 @@ class ActionMaskGenerator:
                 masks[0] = 1.0
 
         elif action_type == ActionType.USE_SKILL:
+            from skills.base import ActiveSkill
+
             skills = self._get_attr(player, "skills", [])
             if card_idx is not None and 0 <= card_idx < len(skills):
                 skill = skills[card_idx]
+                if not isinstance(skill, ActiveSkill):
+                    return masks
                 targets = self._get_skill_targets(player, skill, players)
                 for t in targets:
                     t_idx = self._get_attr(t, "idx") or self._get_attr(t, "player_id")
@@ -431,8 +439,13 @@ class ActionMaskGenerator:
         return False
 
     def _has_usable_skills(self, player) -> bool:
+        from skills.base import ActiveSkill
+
         skills = self._get_attr(player, "skills", [])
-        return len(skills) > 0
+        for skill in skills:
+            if isinstance(skill, ActiveSkill):
+                return True
+        return False
 
     def _can_modify_judge(self, player) -> bool:
         """检查玩家是否可以改判"""

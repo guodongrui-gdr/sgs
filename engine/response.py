@@ -136,6 +136,13 @@ class ResponseSystem:
         original_target: "Player",
         wuxie_count: int,
     ) -> bool:
+        max_wuxie_depth = 10
+        if wuxie_count >= max_wuxie_depth:
+            import logging
+
+            logging.warning(f"无懈可击链达到最大深度 {max_wuxie_depth}")
+            return False
+
         for player in self.engine.players:
             if not player.is_alive:
                 continue
@@ -254,8 +261,11 @@ class CardResolver:
 
         current = target
         loser = None
+        max_juedou_rounds = 50
+        round_count = 0
 
-        while True:
+        while round_count < max_juedou_rounds:
+            round_count += 1
             request = ResponseRequest(
                 response_type=ResponseType.SHA,
                 prompt=f"{current.commander_name} 请出杀 (决斗)",
@@ -273,6 +283,12 @@ class CardResolver:
             # print(f"{current.commander_name} 打出了杀")
 
             current = source if current == target else target
+
+        if round_count >= max_juedou_rounds:
+            import logging
+
+            logging.warning(f"决斗达到最大轮数 {max_juedou_rounds}，强制结束")
+            loser = target
 
         if loser:
             self.engine.deal_damage(source, loser, None, 1, False)
@@ -368,8 +384,8 @@ class CardResolver:
 
         if target.is_human:
             # print(
-                #     f"\n你的手牌: {list(enumerate([str(c) for c in target.hand_cards], 1))}"
-                # )
+            #     f"\n你的手牌: {list(enumerate([str(c) for c in target.hand_cards], 1))}"
+            # )
             idx = int(input("选择一张牌展示: ")) - 1
             show_card = (
                 target.hand_cards[idx]
@@ -450,8 +466,8 @@ class CardResolver:
             source.hand_cards.append(weapon)
             target.equipment["武器"] = None
             # print(
-                #     f"{target.commander_name} 将 {weapon.name} 交给了 {source.commander_name}"
-                # )
+            #     f"{target.commander_name} 将 {weapon.name} 交给了 {source.commander_name}"
+            # )
             return True
 
     def _calculate_distance(self, source: "Player", target: "Player") -> int:
