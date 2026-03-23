@@ -74,12 +74,11 @@ class ResponseSystem:
     def _default_human_response(
         self, player: "Player", available_cards: List["Card"], request: ResponseRequest
     ) -> Optional["Card"]:
-        # print(f"\n{request.prompt}")
-        # print(f"可用卡牌: {list(enumerate([str(c) for c in available_cards], 1))}")
+        print(f"\n{request.prompt}")
+        print(f"可用卡牌: {list(enumerate([str(c) for c in available_cards], 1))}")
 
         if request.can_skip:
-            # print("输入 0 跳过")
-            pass
+            print("输入 0 跳过")
 
         try:
             choice = int(input("选择: "))
@@ -196,11 +195,13 @@ class CardResolver:
         self.engine = engine
         self.response_system = ResponseSystem(engine)
 
-    def resolve_sha(self, source: "Player", target: "Player", card: "Card") -> bool:
+    def resolve_sha(
+        self, source: "Player", target: "Player", card: "Card", event_data: dict = None
+    ) -> bool:
         from engine.event import EventType
 
         damage = 1 + source.jiu_effect
-        is_elemental = "火" in card.name or "雷" in card.name
+        is_elemental = getattr(card, "is_elemental", False)
 
         ask_event = self.engine._emit_event(
             EventType.ASK_FOR_SHA,
@@ -214,20 +215,14 @@ class CardResolver:
         if target.equipment.get("防具"):
             armour = target.equipment["防具"]
             if armour.name == "仁王盾" and card.color in ["黑桃", "梅花"]:
-                # print(f"仁王盾生效，黑杀无效!")
+                self.engine.log(f"仁王盾生效，黑杀无效!")
                 return False
             if armour.name == "藤甲" and not is_elemental:
-                # print(f"藤甲生效，普通杀无效!")
+                self.engine.log(f"藤甲生效，普通杀无效!")
                 return False
 
-        request = ResponseRequest(
-            response_type=ResponseType.SHAN,
-            prompt=f"{target.commander_name} 被杀! 是否出闪?",
-            source=source,
-            target=target,
-            card=card,
-            can_skip=True,
-        )
+        wushuang_active = event_data and event_data.get("wushuang_sha", False)
+        shan_needed = 2 if wushuang_active else 1
 
         if target.equipment.get("防具") and target.equipment["防具"].name == "八卦阵":
             import random
@@ -238,14 +233,38 @@ class CardResolver:
                 self.engine.log(f"八卦阵判定: {judge_card}")
                 if judge_card.color in ["红桃", "方块"]:
                     self.engine.log(f"{target.commander_name} 的八卦阵生效，视为出闪!")
-                    return False
+                    shan_needed -= 1
+                    if shan_needed <= 0:
+                        return False
 
-        shan = self.response_system.ask_for_response(target, request)
+        shan_played = 0
+        while shan_played < shan_needed:
+            request = ResponseRequest(
+                response_type=ResponseType.SHAN,
+                prompt=f"{target.commander_name} 需要出闪 ({shan_played + 1}/{shan_needed})",
+                source=source,
+                target=target,
+                card=card,
+                can_skip=True,
+            )
 
-        if shan:
+            shan = self.response_system.ask_for_response(target, request)
+
+            if not shan:
+                break
+
             target.hand_cards.remove(shan)
             self.engine.discard_pile.append(shan)
-            self.engine.log(f"{target.commander_name} 打出了闪，躲避了杀")
+            shan_played += 1
+            self.engine.log(
+                f"{target.commander_name} 打出了闪 ({shan_played}/{shan_needed})"
+            )
+
+        if shan_played >= shan_needed:
+            if wushuang_active:
+                self.engine.log(
+                    f"{target.commander_name} 打出了{shan_played}张闪，躲避了杀（无双）"
+                )
             return False
 
         actual_damage = damage

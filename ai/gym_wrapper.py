@@ -149,6 +149,11 @@ class SGSEnv(_BaseEnv):
 
         self.controlled_player_idx: int = 0
 
+        from ai.skill_decision import SkillDecisionContext
+
+        self.skill_decision_context = SkillDecisionContext()
+        self._skill_decision_step: int = 0
+
     def _setup_spaces(self):
         state_dim = self.state_encoder.get_state_dim(self.config.player_num)
 
@@ -175,7 +180,14 @@ class SGSEnv(_BaseEnv):
                     shape=(self.action_encoder.target_dim,),
                     dtype=np.float32,
                 ),
-                "current_step": spaces.Discrete(3),
+                "current_step": spaces.Discrete(4),
+                "skill_decision_type": spaces.Discrete(8),
+                "skill_decision_mask": spaces.Box(
+                    low=0,
+                    high=1,
+                    shape=(self.action_encoder.card_dim,),
+                    dtype=np.float32,
+                ),
             }
         )
 
@@ -195,6 +207,9 @@ class SGSEnv(_BaseEnv):
         self.action_history = []
         self._winner = None
         self._pending_rewards = 0.0
+        self._skill_decision_step = 0
+
+        self.skill_decision_context.clear()
 
         self.reward_system.reset()
 
@@ -202,6 +217,7 @@ class SGSEnv(_BaseEnv):
 
         self._run_until_player_turn()
 
+        # 更新受控玩家索引为当前玩家
         self.controlled_player_idx = self.current_player_idx
 
         obs = self._get_observation()
@@ -233,6 +249,16 @@ class SGSEnv(_BaseEnv):
                 break
 
             current = self.players[self.current_player_idx]
+
+            # 检查受控玩家是否存活，如果已死则更新
+            controlled = (
+                self.players[self.controlled_player_idx]
+                if self.controlled_player_idx < len(self.players)
+                else None
+            )
+            if controlled is None or not controlled.is_alive:
+                # 受控玩家已死，更新为当前玩家
+                self.controlled_player_idx = self.current_player_idx
 
             if not current.is_alive:
                 self.engine.next_turn()
@@ -275,6 +301,7 @@ class SGSEnv(_BaseEnv):
                 self.engine.next_turn()
                 self.current_player_idx = self.engine.current_player_idx
                 self.round_count = self.engine.round_num
+                continue
             else:
                 self.engine.phase = GamePhase.PLAY_PHASE
                 break
@@ -353,11 +380,26 @@ class SGSEnv(_BaseEnv):
                     self._do_end_turn(player)
                     break
 
-                skill_idx = 0
+                # 重新生成 current_step=1 的技能掩码
+                skill_mask, _, _ = self.action_mask_generator.generate_masks(
+                    game_state,
+                    player,
+                    self.engine,
+                    1,
+                    HierarchicalAction(action_type=action_type),
+                )
+
+                # 找到第一个可用的技能
+                skill_idx = -1
                 for i, skill in enumerate(skills):
-                    if i < len(card_mask) and card_mask[i] > 0:
+                    if i < len(skill_mask) and skill_mask[i] > 0:
                         skill_idx = i
                         break
+
+                if skill_idx < 0:
+                    # 没有可用技能，结束回合
+                    self._do_end_turn(player)
+                    break
 
                 _, _, new_target_mask = self.action_mask_generator.generate_masks(
                     game_state,
@@ -409,20 +451,35 @@ class SGSEnv(_BaseEnv):
         self, player: Player, skill_idx: int, target_idx: int
     ) -> bool:
         """执行技能动作"""
+        from skills.base import ActiveSkill
+        from engine.event import Event, EventType
+
         skills = getattr(player, "skills", [])
         if skill_idx >= len(skills):
             return False
 
         skill = skills[skill_idx]
+        if not isinstance(skill, ActiveSkill):
+            logger.debug(f"Cannot actively use passive skill: {skill.name}")
+            return False
+
         target = None
         if target_idx is not None and 0 <= target_idx < len(self.players):
             target = self.players[target_idx]
 
         try:
-            if hasattr(skill, "execute"):
-                result = skill.execute(self.engine, player, target)
-                return True
-            return False
+            event = Event(
+                type=EventType.SKILL_TRIGGERED,
+                source=player,
+                target=target,
+                engine=self.engine,
+            )
+            if skill.can_activate(event, self.engine):
+                result = skill.execute(event, self.engine)
+                return result is not None
+            else:
+                logger.debug(f"Skill {skill.name} cannot be activated")
+                return False
         except Exception as e:
             logger.debug(f"AI skill action failed: {e}")
             return False
@@ -476,7 +533,15 @@ class SGSEnv(_BaseEnv):
             self.players.append(player)
 
     def step(self, action: int) -> Tuple[Dict, float, bool, bool, Dict]:
+        from skills.base import set_current_env, clear_current_env
+
         self._total_steps += 1
+
+        if self.skill_decision_context.has_pending_decision():
+            return self._handle_skill_decision(action)
+
+        set_current_env(self)
+
         self._turn_steps += 1
 
         if self._turn_steps > self._max_turn_steps:
@@ -506,6 +571,7 @@ class SGSEnv(_BaseEnv):
 
         if not valid_action:
             obs = self._get_observation()
+            clear_current_env()
             return obs, -0.1, False, True, {"error": "Invalid action"}
 
         last_action_type = (
@@ -532,6 +598,7 @@ class SGSEnv(_BaseEnv):
             info["winner"] = self._winner
             info["player_identity"] = self.players[self.current_player_idx].identity
 
+        clear_current_env()
         return obs, reward, done, truncated, info
 
     def _validate_action(self, action: int) -> bool:
@@ -546,14 +613,16 @@ class SGSEnv(_BaseEnv):
                 return False
             mask = self._get_card_mask()
             if mask.sum() == 0:
-                return True
+                # 没有可用的卡牌/技能，应该结束回合而不是接受任意动作
+                return False
             return mask[action] > 0
         elif self.current_step == 2:
             if action >= self.action_encoder.target_dim:
                 return False
             mask = self._get_target_mask()
             if mask.sum() == 0:
-                return True
+                # 没有可用目标，动作无效
+                return False
             return mask[action] > 0
         return False
 
@@ -586,26 +655,63 @@ class SGSEnv(_BaseEnv):
             if self.pending_action:
                 card_mask = self._get_card_mask()
                 if card_mask.sum() == 0:
+                    # 没有可用的卡牌/技能，强制结束回合
+                    logger.warning(
+                        f"No valid cards/skills available, forcing end turn. "
+                        f"action_type={self.pending_action.action_type}"
+                    )
                     self._execute_end_turn()
                     return
+
+                # 检查选择的动作是否在掩码中
+                if action >= len(card_mask) or card_mask[action] == 0:
+                    logger.warning(
+                        f"Invalid card/skill selection: action={action}, mask_sum={card_mask.sum()}"
+                    )
+                    # 选择第一个有效的
+                    valid_indices = [i for i, m in enumerate(card_mask) if m > 0]
+                    if valid_indices:
+                        action = valid_indices[0]
+                    else:
+                        self._execute_end_turn()
+                        return
 
                 self.pending_action.card_idx = int(action)
 
                 player = self.players[self.current_player_idx]
-                hand_cards = player.hand_cards
-                card = (
-                    hand_cards[int(action)] if int(action) < len(hand_cards) else None
-                )
 
-                if card is None:
-                    logger.warning(
-                        f"Step=1: action={action} but card is None, hand_size={len(hand_cards)}, "
-                        f"action_type={self.pending_action.action_type}"
+                # 区分 USE_CARD 和 USE_SKILL
+                if self.pending_action.action_type == ActionType.USE_SKILL:
+                    # 技能选择
+                    skills = getattr(player, "skills", [])
+                    skill = skills[int(action)] if int(action) < len(skills) else None
+
+                    if skill is None:
+                        logger.warning(
+                            f"Step=1: action={action} but skill is None, skills_count={len(skills)}"
+                        )
+
+                    needs_target = self.action_encoder.needs_target(
+                        self.pending_action.action_type, skill
+                    )
+                else:
+                    # 卡牌选择
+                    hand_cards = player.hand_cards
+                    card = (
+                        hand_cards[int(action)]
+                        if int(action) < len(hand_cards)
+                        else None
                     )
 
-                needs_target = self.action_encoder.needs_target(
-                    self.pending_action.action_type, card
-                )
+                    if card is None:
+                        logger.warning(
+                            f"Step=1: action={action} but card is None, hand_size={len(hand_cards)}, "
+                            f"action_type={self.pending_action.action_type}"
+                        )
+
+                    needs_target = self.action_encoder.needs_target(
+                        self.pending_action.action_type, card
+                    )
 
                 if needs_target:
                     self.current_step = 2
@@ -720,17 +826,27 @@ class SGSEnv(_BaseEnv):
             if action.card_idx is not None and 0 <= action.card_idx < len(skills):
                 skill = skills[action.card_idx]
                 if isinstance(skill, ActiveSkill):
+                    target = None
+                    if action.target_idx is not None and 0 <= action.target_idx < len(
+                        self.players
+                    ):
+                        target = self.players[action.target_idx]
+
                     from engine.event import Event, EventType
 
                     event = Event(
                         type=EventType.SKILL_TRIGGERED,
                         source=player,
+                        target=target,
                         engine=self.engine,
                     )
                     if skill.can_activate(event, self.engine):
                         result = skill.execute(event, self.engine)
                         if result is not None:
-                            logger.info(f"Using skill: {skill.name}")
+                            logger.info(
+                                f"Using skill: {skill.name}"
+                                + (f" on {target.commander_name}" if target else "")
+                            )
                             action_executed = True
                         else:
                             logger.warning(
@@ -879,13 +995,25 @@ class SGSEnv(_BaseEnv):
 
         mask_type, mask_card, mask_target = self._get_action_masks()
 
-        return {
+        obs = {
             "state": encoded_state,
             "action_mask_type": mask_type,
             "action_mask_card": mask_card,
             "action_mask_target": mask_target,
             "current_step": self.current_step,
+            "skill_decision_type": 0,
+            "skill_decision_mask": np.zeros(
+                self.action_encoder.card_dim, dtype=np.float32
+            ),
         }
+
+        if self.skill_decision_context.has_pending_decision():
+            request = self.skill_decision_context.active_request
+            obs["current_step"] = 3
+            obs["skill_decision_type"] = int(request.decision_type)
+            obs["skill_decision_mask"] = self._get_skill_decision_mask()
+
+        return obs
 
     def _get_game_state_dict(self) -> Dict:
         if self.engine is None:
@@ -969,6 +1097,126 @@ class SGSEnv(_BaseEnv):
             )
 
         return "\n".join(lines)
+
+    def _handle_skill_decision(
+        self, action: int
+    ) -> Tuple[Dict, float, bool, bool, Dict]:
+        """处理技能决策的step"""
+        request = self.skill_decision_context.active_request
+        if request is None:
+            obs = self._get_observation()
+            return obs, 0.0, False, False, {"error": "No pending decision"}
+
+        action = int(action)
+        mask = self._get_skill_decision_mask()
+
+        if action < 0 or action >= len(mask) or mask[action] == 0:
+            obs = self._get_observation()
+            return obs, -0.1, False, False, {"error": "Invalid skill decision"}
+
+        from ai.skill_decision import SkillDecisionType
+
+        if request.decision_type == SkillDecisionType.YES_NO:
+            request.result = action == 1
+            request.is_resolved = True
+
+        elif request.decision_type == SkillDecisionType.SELECT_ORDER:
+            request.add_selection(action)
+            if request.is_complete():
+                request.result = request.get_result()
+                request.is_resolved = True
+
+        elif request.decision_type == SkillDecisionType.SELECT_PAIR:
+            request.add_selection(action)
+            if request.is_complete():
+                request.result = request.get_result()
+                request.is_resolved = True
+
+        elif request.decision_type in (
+            SkillDecisionType.SELECT_CARDS,
+            SkillDecisionType.SELECT_TARGETS,
+        ):
+            request.add_selection(action)
+            if request.is_complete():
+                request.result = request.get_result()
+                request.is_resolved = True
+
+        elif request.decision_type == SkillDecisionType.DISTRIBUTE:
+            if request.result is None:
+                request.result = {}
+            item_idx = self._skill_decision_step
+            if item_idx < len(request.context.get("items", [])):
+                request.result[item_idx] = action
+                self._skill_decision_step += 1
+            if self._skill_decision_step >= len(request.context.get("items", [])):
+                request.is_resolved = True
+
+        if request.is_resolved:
+            self.skill_decision_context.clear()
+            self._skill_decision_step = 0
+
+        obs = self._get_observation()
+        info = self._get_info()
+        info["skill_decision"] = request.skill_name
+        info["skill_decision_type"] = request.decision_type.name
+        info["skill_decision_complete"] = request.is_resolved
+
+        return obs, 0.0, False, False, info
+
+    def _get_skill_decision_mask(self) -> np.ndarray:
+        """获取技能决策的mask"""
+        request = self.skill_decision_context.active_request
+        if request is None:
+            return np.zeros(self.action_encoder.card_dim, dtype=np.float32)
+
+        from ai.skill_decision import SkillDecisionType
+
+        mask = np.zeros(self.action_encoder.card_dim, dtype=np.float32)
+
+        if request.decision_type == SkillDecisionType.YES_NO:
+            mask[0] = 1.0
+            mask[1] = 1.0
+
+        elif request.decision_type == SkillDecisionType.SELECT_ORDER:
+            remaining = request.get_remaining_options()
+            for idx in remaining:
+                if idx < len(mask):
+                    mask[idx] = 1.0
+
+        elif request.decision_type == SkillDecisionType.SELECT_PAIR:
+            remaining = request.get_remaining_options()
+            for idx in remaining:
+                if idx < len(mask):
+                    mask[idx] = 1.0
+
+        elif request.decision_type in (
+            SkillDecisionType.SELECT_CARDS,
+            SkillDecisionType.SELECT_TARGETS,
+        ):
+            remaining = request.get_remaining_options()
+            for idx in remaining:
+                if idx < len(mask):
+                    mask[idx] = 1.0
+
+        elif request.decision_type == SkillDecisionType.DISTRIBUTE:
+            for i, target in enumerate(request.options):
+                if i < len(mask):
+                    mask[i] = 1.0
+
+        return mask
+
+    def request_skill_decision(self, request) -> bool:
+        """外部调用此方法发起技能决策请求"""
+        from ai.skill_decision import SkillDecisionContext
+
+        self.skill_decision_context.active_request = request
+        return True
+
+    def get_skill_decision_result(self):
+        """获取技能决策结果"""
+        if self.skill_decision_context.active_request:
+            return self.skill_decision_context.active_request.get_result()
+        return None
 
     def close(self):
         self.engine = None

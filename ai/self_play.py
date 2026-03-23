@@ -51,12 +51,16 @@ class SelfPlayConfig:
     update_opponent_freq: int = 25_000
     n_eval_games: int = 100
 
-    learning_rate: float = 3e-4
+    learning_rate: float = 5e-4
+    lr_schedule: str = "cosine"
     n_steps: int = 2048
-    batch_size: int = 64
+    batch_size: int = 256
     n_epochs: int = 10
     gamma: float = 0.99
-    gae_lambda: float = 0.95
+    gae_lambda: float = 0.98
+    ent_coef: float = 0.05
+    vf_coef: float = 0.25
+    clip_range: float = 0.2
 
     player_num: int = 5
     max_rounds: int = 100
@@ -132,6 +136,9 @@ class SelfPlayTrainer:
                 n_epochs=self.config.n_epochs,
                 gamma=self.config.gamma,
                 gae_lambda=self.config.gae_lambda,
+                ent_coef=self.config.ent_coef,
+                vf_coef=self.config.vf_coef,
+                clip_range=self.config.clip_range,
                 seed=self.config.seed,
                 tensorboard_log=str(self.log_dir / "tensorboard"),
                 verbose=1,
@@ -146,6 +153,9 @@ class SelfPlayTrainer:
                 n_epochs=self.config.n_epochs,
                 gamma=self.config.gamma,
                 gae_lambda=self.config.gae_lambda,
+                ent_coef=self.config.ent_coef,
+                vf_coef=self.config.vf_coef,
+                clip_range=self.config.clip_range,
                 seed=self.config.seed,
                 tensorboard_log=str(self.log_dir / "tensorboard"),
                 verbose=1,
@@ -382,8 +392,17 @@ if __name__ == "__main__":
     parser.add_argument("--timesteps", type=int, default=10_000_000)
     parser.add_argument("--player-num", type=int, default=5)
     parser.add_argument("--log-dir", type=str, default=None)
-    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--gae-lambda", type=float, default=0.98)
+    parser.add_argument("--ent-coef", type=float, default=0.05)
+    parser.add_argument("--vf-coef", type=float, default=0.25)
+    parser.add_argument("--n-steps", type=int, default=2048)
+    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--pool-size", type=int, default=10)
+    parser.add_argument("--save-freq", type=int, default=100_000)
+    parser.add_argument("--eval-freq", type=int, default=50_000)
 
     args = parser.parse_args()
 
@@ -393,4 +412,13 @@ if __name__ == "__main__":
         log_dir=args.log_dir,
         learning_rate=args.lr,
         seed=args.seed,
+        gamma=args.gamma,
+        gae_lambda=args.gae_lambda,
+        ent_coef=args.ent_coef,
+        vf_coef=args.vf_coef,
+        n_steps=args.n_steps,
+        batch_size=args.batch_size,
+        pool_size=args.pool_size,
+        save_freq=args.save_freq,
+        eval_freq=args.eval_freq,
     )

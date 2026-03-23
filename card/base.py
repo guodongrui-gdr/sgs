@@ -5,6 +5,11 @@ if TYPE_CHECKING:
     from player.player import Player
 
 
+def is_sha_card(card) -> bool:
+    """检查卡牌是否是杀（包括普通杀、火杀、雷杀）"""
+    return isinstance(card, ShaCard)
+
+
 class Card:
     def __init__(
         self,
@@ -47,10 +52,7 @@ class BasicCard(Card):
         kwargs.setdefault("card_type", "BasicCard")
         super().__init__(name, color, point, **kwargs)
 
-        if name == "杀":
-            self.target_types = ["another_player"]
-            self.distance = 1
-        elif name == "闪":
+        if name == "闪":
             self.target_types = []
         elif name == "桃":
             self.target_types = ["self", "dying_player"]
@@ -58,15 +60,34 @@ class BasicCard(Card):
             self.target_types = ["self"]
 
 
-class FireSha(BasicCard):
+class ShaCard(BasicCard):
+    """杀类卡牌的基类"""
+
+    def __init__(self, name: str = "杀", color: str = "", point: int = 0, **kwargs):
+        super().__init__(name, color, point, **kwargs)
+        self.target_types = ["another_player"]
+        self.distance = 1
+        self.is_elemental = False
+
+    def is_sha(self) -> bool:
+        return True
+
+
+class FireSha(ShaCard):
+    """火杀"""
+
     def __init__(self, name: str = "火杀", color: str = "", point: int = 0, **kwargs):
         super().__init__(name, color, point, **kwargs)
+        self.is_elemental = True
         self.is_fire = True
 
 
-class ThunderSha(BasicCard):
+class ThunderSha(ShaCard):
+    """雷杀"""
+
     def __init__(self, name: str = "雷杀", color: str = "", point: int = 0, **kwargs):
         super().__init__(name, color, point, **kwargs)
+        self.is_elemental = True
         self.is_thunder = True
 
 

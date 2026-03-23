@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from player.player import Player
-    from card.base import Card
+    from card.base import Card, is_sha_card
+else:
+    from card.base import is_sha_card
 
 
 class GameEngine:
@@ -33,6 +35,7 @@ class GameEngine:
         self.current_player_idx = 0
         self.round_num = 1
         self.phase = GamePhase.WAITING
+        self._winner: Optional[str] = None
 
         self.action_log: List[str] = []
 
@@ -66,6 +69,8 @@ class GameEngine:
 
         self.players = player_classes
 
+        random.shuffle(self.players)
+
         identities = self._distribute_identities()
         for i, player in enumerate(self.players):
             player.identity = identities[i]
@@ -85,7 +90,6 @@ class GameEngine:
         for player in self.players:
             player.hand_cards = self.draw_cards(player, 4)
 
-        self.phase = GamePhase.TURN_START
         self._emit_event(EventType.GAME_START)
 
     def _distribute_identities(self) -> List[str]:
@@ -128,7 +132,7 @@ class GameEngine:
         if card not in player.hand_cards:
             return False
 
-        if card.name == "杀":
+        if is_sha_card(card):
             if player.sha_count >= self._get_max_sha(player):
                 return False
             player.sha_count += 1
@@ -155,53 +159,65 @@ class GameEngine:
             EventType.CARD_USED, source=player, target=target, card=card
         )
 
+        if target:
+            target_event = self._emit_event(
+                EventType.CARD_TARGETED, source=player, target=target, card=card
+            )
+            event.data.update(target_event.data)
+
         if not event.is_cancelled():
-            self._resolve_card(player, card, target)
+            self._resolve_card(player, card, target, event)
 
         return True
 
-    def _resolve_card(self, player: "Player", card: "Card", target: Optional["Player"]):
+    def _resolve_card(
+        self,
+        player: "Player",
+        card: "Card",
+        target: Optional["Player"],
+        event: Optional["Event"] = None,
+    ):
         if card.name == "桃":
             if player.current_hp < player.max_hp:
                 player.current_hp += 1
                 self.log(
-                    f"{player.commander_name} 使用桃，恢复1点体力，当前体力: {player.current_hp}/{player.max_hp}"
+                    f"{player.commander_name} 使用 {card}，恢复1点体力，当前体力: {player.current_hp}/{player.max_hp}"
                 )
             self._move_to_discard(card)
 
         elif card.name == "无中生有":
             drawn = self.draw_cards(player, 2)
             player.hand_cards.extend(drawn)
-            self.log(f"{player.commander_name} 使用无中生有，摸了2张牌")
+            self.log(f"{player.commander_name} 使用 {card}，摸了2张牌")
             self._move_to_discard(card)
 
-        elif "杀" in card.name and target:
+        elif is_sha_card(card) and target:
             damage = 1 + player.jiu_effect
-            is_elemental = "火" in card.name or "雷" in card.name
-            self.log(
-                f"{player.commander_name} 对 {target.commander_name} 使用{card.name}"
+            is_elemental = getattr(card, "is_elemental", False)
+            self.log(f"{player.commander_name} 对 {target.commander_name} 使用 {card}")
+            self.card_resolver.resolve_sha(
+                player, target, card, event.data if event else None
             )
-            self.card_resolver.resolve_sha(player, target, card)
             player.jiu_effect = 0
             self._move_to_discard(card)
 
         elif card.name == "决斗" and target:
-            self.log(f"{player.commander_name} 对 {target.commander_name} 使用决斗")
+            self.log(f"{player.commander_name} 对 {target.commander_name} 使用 {card}")
             self.card_resolver.resolve_juedou(player, target)
             self._move_to_discard(card)
 
         elif card.name == "南蛮入侵":
-            self.log(f"{player.commander_name} 使用南蛮入侵")
+            self.log(f"{player.commander_name} 使用 {card}")
             self.card_resolver.resolve_namaninru(player)
             self._move_to_discard(card)
 
         elif card.name == "万箭齐发":
-            self.log(f"{player.commander_name} 使用万箭齐发")
+            self.log(f"{player.commander_name} 使用 {card}")
             self.card_resolver.resolve_wanjianqifa(player)
             self._move_to_discard(card)
 
         elif card.name == "火攻" and target:
-            self.log(f"{player.commander_name} 对 {target.commander_name} 使用火攻")
+            self.log(f"{player.commander_name} 对 {target.commander_name} 使用 {card}")
             self.card_resolver.resolve_huogong(player, target)
             self._move_to_discard(card)
 
@@ -241,27 +257,34 @@ class GameEngine:
 
         elif card.card_type == "WeaponCard":
             self._equip_weapon(player, card)
+            self.log(f"{player.commander_name} 装备了 {card.name}")
+            if card.name == "诸葛连弩":
+                player.unlimited_sha = True
 
         elif card.card_type == "ArmourCard":
             self._equip_armour(player, card)
+            self.log(f"{player.commander_name} 装备了 {card.name}")
 
         elif card.card_type == "AttackHorseCard":
             self._equip_attack_horse(player, card)
+            self.log(f"{player.commander_name} 装备了 {card.name}")
 
         elif card.card_type == "DefenseHorseCard":
             self._equip_defense_horse(player, card)
+            self.log(f"{player.commander_name} 装备了 {card.name}")
 
         elif card.card_type == "TreasureCard":
             self._equip_treasure(player, card)
+            self.log(f"{player.commander_name} 装备了 {card.name}")
 
     def _resolve_chaiqiao(self, source: "Player", target: "Player"):
-        if target.is_human:
-            # print(f"\n{target.commander_name} 的区域:")
-            # print(f"  手牌数: {len(target.hand_cards)}")
-            # print(
-            #     f"  装备: {[(k, v.name if v else '无') for k, v in target.equipment.items()]}"
-            # )
-            # print(f"  判定区: {[c.name for c in target.judge_area]}")
+        if source.is_human:
+            print(f"\n{target.commander_name} 的区域:")
+            print(f"  手牌数: {len(target.hand_cards)}")
+            print(
+                f"  装备: {[(k, v.name if v else '无') for k, v in target.equipment.items()]}"
+            )
+            print(f"  判定区: {[c.name for c in target.judge_area]}")
             choice = input(
                 "选择弃置区域 (h=手牌, w=武器, a=防具, j=进攻马, d=防御马, t=宝物, p=判定区): "
             )
@@ -283,29 +306,49 @@ class GameEngine:
             card = random.choice(target.hand_cards)
             target.hand_cards.remove(card)
             self.discard_pile.append(card)
-            # print(f"弃置了 {target.commander_name} 的 {card}")
+            self.log(f"弃置了 {target.commander_name} 的 {card}")
         elif choice == "w" and target.equipment.get("武器"):
             self.discard_pile.append(target.equipment["武器"])
-            # print(f"弃置了 {target.commander_name} 的 {target.equipment['武器'].name}")
-            from card.base import WeaponCard
-
+            self.log(
+                f"弃置了 {target.commander_name} 的 {target.equipment['武器'].name}"
+            )
             target.equipment["武器"] = None
         elif choice == "a" and target.equipment.get("防具"):
             self.discard_pile.append(target.equipment["防具"])
-            # print(f"弃置了 {target.commander_name} 的 {target.equipment['防具'].name}")
+            self.log(
+                f"弃置了 {target.commander_name} 的 {target.equipment['防具'].name}"
+            )
             target.equipment["防具"] = None
+        elif choice == "j" and target.equipment.get("进攻坐骑"):
+            self.discard_pile.append(target.equipment["进攻坐骑"])
+            self.log(
+                f"弃置了 {target.commander_name} 的 {target.equipment['进攻坐骑'].name}"
+            )
+            target.equipment["进攻坐骑"] = None
+        elif choice == "d" and target.equipment.get("防御坐骑"):
+            self.discard_pile.append(target.equipment["防御坐骑"])
+            self.log(
+                f"弃置了 {target.commander_name} 的 {target.equipment['防御坐骑'].name}"
+            )
+            target.equipment["防御坐骑"] = None
+        elif choice == "t" and target.equipment.get("宝物"):
+            self.discard_pile.append(target.equipment["宝物"])
+            self.log(
+                f"弃置了 {target.commander_name} 的 {target.equipment['宝物'].name}"
+            )
+            target.equipment["宝物"] = None
         elif choice == "p" and target.judge_area:
             card = target.judge_area.pop()
             self.discard_pile.append(card)
-            # print(f"弃置了 {target.commander_name} 判定区的 {card.name}")
+            self.log(f"弃置了 {target.commander_name} 判定区的 {card.name}")
 
     def _resolve_shunshou(self, source: "Player", target: "Player"):
-        if target.is_human:
-            # print(f"\n{target.commander_name} 的区域:")
-            # print(f"  手牌数: {len(target.hand_cards)}")
-            # print(
-            #     f"  装备: {[(k, v.name if v else '无') for k, v in target.equipment.items()]}"
-            # )
+        if source.is_human:
+            print(f"\n{target.commander_name} 的区域:")
+            print(f"  手牌数: {len(target.hand_cards)}")
+            print(
+                f"  装备: {[(k, v.name if v else '无') for k, v in target.equipment.items()]}"
+            )
             choice = input(
                 "选择获得区域 (h=手牌, w=武器, a=防具, j=进攻马, d=防御马, t=宝物): "
             )
@@ -316,6 +359,10 @@ class GameEngine:
                 choice = "w"
             elif target.equipment.get("防具"):
                 choice = "a"
+            elif target.equipment.get("进攻坐骑"):
+                choice = "j"
+            elif target.equipment.get("防御坐骑"):
+                choice = "d"
             else:
                 return
 
@@ -325,21 +372,43 @@ class GameEngine:
             card = random.choice(target.hand_cards)
             target.hand_cards.remove(card)
             source.hand_cards.append(card)
-            # print(f"获得了 {target.commander_name} 的 {card}")
+            self.log(f"获得了 {target.commander_name} 的 {card}")
         elif choice == "w" and target.equipment.get("武器"):
             source.hand_cards.append(target.equipment["武器"])
-            # print(f"获得了 {target.commander_name} 的 {target.equipment['武器'].name}")
+            self.log(
+                f"获得了 {target.commander_name} 的 {target.equipment['武器'].name}"
+            )
             target.equipment["武器"] = None
         elif choice == "a" and target.equipment.get("防具"):
             source.hand_cards.append(target.equipment["防具"])
-            # print(f"获得了 {target.commander_name} 的 {target.equipment['防具'].name}")
+            self.log(
+                f"获得了 {target.commander_name} 的 {target.equipment['防具'].name}"
+            )
             target.equipment["防具"] = None
+        elif choice == "j" and target.equipment.get("进攻坐骑"):
+            source.hand_cards.append(target.equipment["进攻坐骑"])
+            self.log(
+                f"获得了 {target.commander_name} 的 {target.equipment['进攻坐骑'].name}"
+            )
+            target.equipment["进攻坐骑"] = None
+        elif choice == "d" and target.equipment.get("防御坐骑"):
+            source.hand_cards.append(target.equipment["防御坐骑"])
+            self.log(
+                f"获得了 {target.commander_name} 的 {target.equipment['防御坐骑'].name}"
+            )
+            target.equipment["防御坐骑"] = None
+        elif choice == "t" and target.equipment.get("宝物"):
+            source.hand_cards.append(target.equipment["宝物"])
+            self.log(
+                f"获得了 {target.commander_name} 的 {target.equipment['宝物'].name}"
+            )
+            target.equipment["宝物"] = None
 
     def _resolve_tiesuo(self, source: "Player", target: Optional["Player"]):
         if target:
             target.is_chained = not target.is_chained
             status = "连环" if target.is_chained else "重置"
-            # print(f"{target.commander_name} {status}")
+            self.log(f"{target.commander_name} {status}")
         else:
             for p in self.players:
                 if p.is_alive:
@@ -347,12 +416,13 @@ class GameEngine:
 
     def _resolve_wugu(self, source: "Player"):
         alive_count = len([p for p in self.players if p.is_alive])
-        cards = self.draw_cards(source, alive_count)
+        cards = self.draw_cards(source, min(alive_count, 5))
+        if not cards:
+            return
 
-        # print(f"\n五谷丰登，翻开 {len(cards)} 张牌:")
+        self.log(f"五谷丰登，翻开 {len(cards)} 张牌:")
         for i, c in enumerate(cards):
-            # print(f"  {i + 1}. {c}")
-            pass
+            self.log(f"  {i + 1}. {c}")
 
         self.tmp_cards.extend(cards)
 
@@ -360,30 +430,30 @@ class GameEngine:
         for i, card in enumerate(cards):
             if len(self.tmp_cards) > 0 and current.is_alive:
                 if current.is_human:
-                    # print(
-                    #     f"\n可选牌: {list(enumerate([str(c) for c in self.tmp_cards], 1))}"
-                    # )
+                    print(
+                        f"\n可选牌: {list(enumerate([str(c) for c in self.tmp_cards], 1))}"
+                    )
                     idx = int(input(f"{current.commander_name} 选择获得: ")) - 1
                     if 0 <= idx < len(self.tmp_cards):
                         chosen = self.tmp_cards.pop(idx)
                         current.hand_cards.append(chosen)
-                        # print(f"{current.commander_name} 获得了 {chosen}")
+                        self.log(f"{current.commander_name} 获得了 {chosen}")
                 else:
                     if self.tmp_cards:
                         chosen = self.tmp_cards.pop(0)
                         current.hand_cards.append(chosen)
-                        # print(f"{current.commander_name} 获得了 {chosen}")
+                        self.log(f"{current.commander_name} 获得了 {chosen}")
             current = current.next_player
 
     def _resolve_taoyuan(self, source: "Player"):
         for player in self.players:
             if player.is_alive and player.current_hp < player.max_hp:
                 player.current_hp += 1
-                # print(f"{player.commander_name} 恢复1点体力")
+                self.log(f"{player.commander_name} 恢复1点体力")
 
     def _resolve_jiedaosharen(self, source: "Player", target: "Player", card: "Card"):
         if not target.equipment.get("武器"):
-            # print(f"{target.commander_name} 没有武器，借刀杀人无效")
+            self.log(f"{target.commander_name} 没有武器，借刀杀人无效")
             source.hand_cards.append(card)
             return
 
@@ -395,16 +465,15 @@ class GameEngine:
                     kill_targets.append(p)
 
         if not kill_targets:
-            # print(f"{target.commander_name} 没有可攻击的目标")
+            self.log(f"{target.commander_name} 没有可攻击的目标")
             source.hand_cards.append(card)
             return
 
         kill_target = None
         if source.is_human:
-            # print(f"\n可选的被杀目标:")
+            print(f"\n可选的被杀目标:")
             for i, t in enumerate(kill_targets, 1):
-                # print(f"  {i}. {t.commander_name}")
-                pass
+                print(f"  {i}. {t.commander_name}")
             idx = int(input("选择被杀目标: ")) - 1
             if 0 <= idx < len(kill_targets):
                 kill_target = kill_targets[idx]
@@ -681,6 +750,7 @@ class GameEngine:
 
         winner = self._check_victory()
         if winner:
+            self._winner = winner
             self.phase = GamePhase.GAME_OVER
 
     def _check_victory(self) -> Optional[str]:
@@ -764,6 +834,7 @@ class GameEngine:
             players=player_states,
             deck_count=len(self.deck),
             discard_pile_count=len(self.discard_pile),
+            winner=self._winner,
         )
 
     def next_turn(self):

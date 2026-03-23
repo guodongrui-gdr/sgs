@@ -5,6 +5,7 @@ from pathlib import Path
 from .base import (
     Card,
     BasicCard,
+    ShaCard,
     FireSha,
     ThunderSha,
     JinnangCard,
@@ -22,6 +23,7 @@ from .base import (
 class CardFactory:
     _type_mapping = {
         "BasicCard": BasicCard,
+        "ShaCard": ShaCard,
         "FireSha": FireSha,
         "ThunderSha": ThunderSha,
         "CommonJinnangCard": CommonJinnangCard,
@@ -33,13 +35,23 @@ class CardFactory:
         "TreasureCard": TreasureCard,
     }
 
+    _name_type_mapping = {
+        "杀": ShaCard,
+        "火杀": FireSha,
+        "雷杀": ThunderSha,
+    }
+
     @classmethod
     def create(cls, config: Dict[str, Any]) -> List[Card]:
         config = config.copy()
         card_type = config.pop("type", "BasicCard")
         count = config.pop("count", 1)
+        card_name = config.get("name", "")
 
-        card_class = cls._type_mapping.get(card_type, BasicCard)
+        if card_type == "BasicCard" and card_name in cls._name_type_mapping:
+            card_class = cls._name_type_mapping[card_name]
+        else:
+            card_class = cls._type_mapping.get(card_type, BasicCard)
 
         cards = []
         for _ in range(count):

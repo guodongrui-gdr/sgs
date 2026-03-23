@@ -100,22 +100,35 @@ class Qixi(TriggerSkill):
             return event
 
         black_cards = [c for c in self.player.hand_cards if c.color in ["黑桃", "梅花"]]
-        if black_cards and self.ask_player("是否发动【奇袭】将黑色牌当过河拆桥使用?"):
-            if self.player.is_human:
-                # print(f"可选牌: {list(enumerate([str(c) for c in black_cards], 1))}")
+        if not black_cards:
+            return event
+
+        if not self.ask_player("是否发动【奇袭】将黑色牌当过河拆桥使用?"):
+            return event
+
+        if self.player.is_human:
+            print(f"可选牌: {list(enumerate([str(c) for c in black_cards], 1))}")
+            try:
                 idx = int(input("选择卡牌: ")) - 1
                 if 0 <= idx < len(black_cards):
-                    card = black_cards[idx]
-                    event.data["use_as_chaiqiao"] = card
-                    # print(
-                    #     f">>> {self.player.commander_name} 发动【奇袭】，将 {card} 当过河拆桥使用"
-                    # )
-            else:
-                card = black_cards[0]
-                event.data["use_as_chaiqiao"] = card
-                # print(
-                #     f">>> {self.player.commander_name} 发动【奇袭】，将 {card} 当过河拆桥使用"
-                # )
+                    event.data["use_as_chaiqiao"] = black_cards[idx]
+            except ValueError:
+                pass
+        else:
+            from ai.skill_decision import SkillDecisionType
+
+            selected = self.ask_decision(
+                SkillDecisionType.SELECT_CARDS,
+                black_cards,
+                min_selections=1,
+                max_selections=1,
+                default=[0],
+            )
+
+            if selected:
+                idx = selected[0] if isinstance(selected, list) else selected
+                if 0 <= idx < len(black_cards):
+                    event.data["use_as_chaiqiao"] = black_cards[idx]
 
         return event
 
@@ -322,22 +335,35 @@ class Guose(TriggerSkill):
             return event
 
         diamond_cards = [c for c in self.player.hand_cards if c.color == "方块"]
-        if diamond_cards and self.ask_player("是否发动【国色】将方块牌当乐不思蜀使用?"):
-            if self.player.is_human:
-                # print(f"可选牌: {list(enumerate([str(c) for c in diamond_cards], 1))}")
+        if not diamond_cards:
+            return event
+
+        if not self.ask_player("是否发动【国色】将方块牌当乐不思蜀使用?"):
+            return event
+
+        if self.player.is_human:
+            print(f"可选牌: {list(enumerate([str(c) for c in diamond_cards], 1))}")
+            try:
                 idx = int(input("选择卡牌: ")) - 1
                 if 0 <= idx < len(diamond_cards):
-                    card = diamond_cards[idx]
-                    event.data["use_as_lebusishu"] = card
-                    # print(
-                    #     f">>> {self.player.commander_name} 发动【国色】，将 {card} 当乐不思蜀使用"
-                    # )
-            else:
-                card = diamond_cards[0]
-                event.data["use_as_lebusishu"] = card
-                # print(
-                #     f">>> {self.player.commander_name} 发动【国色】，将 {card} 当乐不思蜀使用"
-                # )
+                    event.data["use_as_lebusishu"] = diamond_cards[idx]
+            except ValueError:
+                pass
+        else:
+            from ai.skill_decision import SkillDecisionType
+
+            selected = self.ask_decision(
+                SkillDecisionType.SELECT_CARDS,
+                diamond_cards,
+                min_selections=1,
+                max_selections=1,
+                default=[0],
+            )
+
+            if selected:
+                idx = selected[0] if isinstance(selected, list) else selected
+                if 0 <= idx < len(diamond_cards):
+                    event.data["use_as_lebusishu"] = diamond_cards[idx]
 
         return event
 
@@ -368,52 +394,78 @@ class Liuli(TriggerSkill):
         if not self.player:
             return event
 
-        if self.ask_player("是否发动【流离】转移杀的目标?"):
-            if self.player.is_human:
-                # print(
-                #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
-                # )
+        if not self.ask_player("是否发动【流离】转移杀的目标?"):
+            return event
+
+        if self.player.is_human:
+            print(
+                f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
+            )
+            try:
                 idx = int(input("选择弃置的牌: ")) - 1
                 if not (0 <= idx < len(self.player.hand_cards)):
                     return event
                 discard_card = self.player.hand_cards.pop(idx)
-            else:
-                import random
+            except ValueError:
+                return event
+        else:
+            from ai.skill_decision import SkillDecisionType
 
-                discard_card = random.choice(self.player.hand_cards)
-                self.player.hand_cards.remove(discard_card)
+            selected = self.ask_decision(
+                SkillDecisionType.SELECT_CARDS,
+                self.player.hand_cards,
+                min_selections=1,
+                max_selections=1,
+                default=[0],
+            )
 
-            engine.discard_pile.append(discard_card)
+            idx = selected[0] if isinstance(selected, list) else selected
+            if not (0 <= idx < len(self.player.hand_cards)):
+                return event
+            discard_card = self.player.hand_cards.pop(idx)
 
-            others = [p for p in engine.players if p != self.player and p.is_alive]
-            in_range = []
-            for p in others:
-                dist = (
-                    engine._calculate_distance(self.player, p)
-                    if hasattr(engine, "_calculate_distance")
-                    else 1
-                )
-                if dist <= self.player.attack_range:
-                    in_range.append(p)
+        engine.discard_pile.append(discard_card)
 
-            if in_range:
-                if self.player.is_human:
-                    # print("可选目标:")
-                    for i, p in enumerate(in_range, 1):
-                        # print(f"  {i}. {p.commander_name}")
-                        pass
-                    idx = int(input("选择目标: ")) - 1
-                    if 0 <= idx < len(in_range):
-                        new_target = in_range[idx]
-                else:
-                    import random
+        others = [p for p in engine.players if p != self.player and p.is_alive]
+        in_range = []
+        for p in others:
+            dist = (
+                engine._calculate_distance(self.player, p)
+                if hasattr(engine, "_calculate_distance")
+                else 1
+            )
+            if dist <= self.player.attack_range:
+                in_range.append(p)
 
-                    new_target = random.choice(in_range)
+        if not in_range:
+            return event
 
-                event.target = new_target
-                # print(
-                #     f">>> {self.player.commander_name} 发动【流离】，将杀转移给 {new_target.commander_name}"
-                # )
+        if self.player.is_human:
+            print("可选目标:")
+            for i, p in enumerate(in_range, 1):
+                print(f"  {i}. {p.commander_name}")
+            try:
+                idx = int(input("选择目标: ")) - 1
+                if 0 <= idx < len(in_range):
+                    event.target = in_range[idx]
+            except ValueError:
+                pass
+        else:
+            from ai.skill_decision import SkillDecisionType
+
+            selected = self.ask_decision(
+                SkillDecisionType.SELECT_TARGETS,
+                in_range,
+                min_selections=1,
+                max_selections=1,
+                default=[0],
+            )
+
+            idx = selected[0] if isinstance(selected, list) else selected
+            if 0 <= idx < len(in_range):
+                event.target = in_range[idx]
+
+        return event
 
         return event
 
@@ -545,11 +597,14 @@ class Jieyin(ActiveSkill):
         if not males:
             return event
 
-        if self.ask_player("是否发动【结姻】?"):
-            if self.player.is_human:
-                # print(
-                #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
-                # )
+        if not self.ask_player("是否发动【结姻】?"):
+            return event
+
+        if self.player.is_human:
+            print(
+                f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
+            )
+            try:
                 indices = [
                     int(x.strip()) - 1
                     for x in input("选择两张牌(逗号分隔): ").split(",")
@@ -566,33 +621,62 @@ class Jieyin(ActiveSkill):
                 if len(cards) < 2:
                     return event
 
-                # print("可选目标:")
+                print("可选目标:")
                 for i, p in enumerate(males, 1):
-                    # print(f"  {i}. {p.commander_name}")
-                    pass
+                    print(f"  {i}. {p.commander_name}")
                 target_idx = int(input("选择目标: ")) - 1
                 if not (0 <= target_idx < len(males)):
                     return event
                 target = males[target_idx]
+            except ValueError:
+                return event
+        else:
+            from ai.skill_decision import SkillDecisionType
+
+            cards_selected = self.ask_decision(
+                SkillDecisionType.SELECT_CARDS,
+                self.player.hand_cards,
+                min_selections=2,
+                max_selections=2,
+                default=[0, 1],
+            )
+
+            target_selected = self.ask_decision(
+                SkillDecisionType.SELECT_TARGETS,
+                males,
+                min_selections=1,
+                max_selections=1,
+                default=[0],
+            )
+
+            if cards_selected and target_selected:
+                cards = [
+                    self.player.hand_cards[i]
+                    for i in cards_selected
+                    if 0 <= i < len(self.player.hand_cards)
+                ]
+                target_idx = (
+                    target_selected[0]
+                    if isinstance(target_selected, list)
+                    else target_selected
+                )
+                target = males[target_idx] if 0 <= target_idx < len(males) else None
+
+                if len(cards) < 2 or target is None:
+                    return event
             else:
-                import random
+                return event
 
-                cards = random.sample(self.player.hand_cards, 2)
-                target = random.choice(males)
+        for card in cards:
+            self.player.hand_cards.remove(card)
+            engine.discard_pile.append(card)
 
-            for card in cards:
-                self.player.hand_cards.remove(card)
-                engine.discard_pile.append(card)
+        if self.player.current_hp < self.player.max_hp:
+            self.player.current_hp += 1
+        if target.current_hp < target.max_hp:
+            target.current_hp += 1
 
-            if self.player.current_hp < self.player.max_hp:
-                self.player.current_hp += 1
-            if target.current_hp < target.max_hp:
-                target.current_hp += 1
-
-            self.use()
-            # print(
-            #     f">>> {self.player.commander_name} 发动【结姻】，与 {target.commander_name} 各回复1点体力"
-            # )
+        self.use()
 
         return event
 

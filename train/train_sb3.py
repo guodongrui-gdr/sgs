@@ -67,16 +67,16 @@ class TrainingConfig:
     def __init__(
         self,
         total_timesteps: int = 1_000_000,
-        learning_rate: float = 3e-4,
-        lr_schedule_type: str = "linear",
+        learning_rate: float = 5e-4,
+        lr_schedule_type: str = "cosine",
         n_steps: int = 2048,
         batch_size: int = 256,
         n_epochs: int = 10,
-        gamma: float = 0.97,
-        gae_lambda: float = 0.95,
+        gamma: float = 0.99,
+        gae_lambda: float = 0.98,
         clip_range: float = 0.2,
-        ent_coef: float = 0.01,
-        vf_coef: float = 0.5,
+        ent_coef: float = 0.05,
+        vf_coef: float = 0.25,
         max_grad_norm: float = 0.5,
         seed: int = 42,
         n_envs: int = 8,
@@ -88,14 +88,14 @@ class TrainingConfig:
         n_eval_episodes: int = 10,
         log_dir: Optional[str] = None,
         model_path: Optional[str] = None,
+        norm_reward: bool = False,
+        clip_reward: float = 100.0,
+        normalize_advantage: bool = True,
     ):
         self.total_timesteps = total_timesteps
         self.learning_rate = learning_rate
         self.lr_schedule_type = lr_schedule_type
-        if n_envs > 1 and n_steps == 2048:
-            self.n_steps = max(256, 2048 // n_envs)
-        else:
-            self.n_steps = n_steps
+        self.n_steps = n_steps
         self.batch_size = batch_size
         self.n_epochs = n_epochs
         self.gamma = gamma
@@ -114,6 +114,9 @@ class TrainingConfig:
         self.n_eval_episodes = n_eval_episodes
         self.log_dir = log_dir or self._default_log_dir()
         self.model_path = model_path
+        self.norm_reward = norm_reward
+        self.clip_reward = clip_reward
+        self.normalize_advantage = normalize_advantage
 
     def _default_log_dir(self) -> str:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -163,31 +166,68 @@ class TrainingConfig:
 class SelfPlayCallback(BaseCallback):
     def __init__(
         self,
-        update_freq: int = 10000,
-        save_freq: int = 50000,
+        update_freq: int = 25000,
+        save_freq: int = 100000,
+        pool_size: int = 10,
+        log_dir: str = None,
         verbose: int = 1,
     ):
         super().__init__(verbose)
         self.update_freq = update_freq
         self.save_freq = save_freq
-        self.policy_pool: List[str] = []
+        self.pool_size = pool_size
+        self.log_dir = log_dir or "./policy_pool"
+        self.policy_pool = None
+        self._policy_version = 0
+
+    def _on_training_start(self) -> None:
+        from ai.policy_pool import PolicyPool
+
+        self.policy_pool = PolicyPool(
+            pool_dir=self.log_dir,
+            max_size=self.pool_size,
+        )
 
     def _on_step(self) -> bool:
-        if self.n_calls % self.update_freq == 0:
+        if self.n_calls % self.update_freq == 0 and self.n_calls > 0:
             self._update_opponents()
 
-        if self.n_calls % self.save_freq == 0:
+        if self.n_calls % self.save_freq == 0 and self.n_calls > 0:
             self._save_checkpoint()
 
         return True
 
     def _update_opponents(self):
-        if self.verbose > 0:
-            print(f"Updating opponents at step {self.n_calls}")
+        if self.policy_pool is None:
+            return
+
+        if len(self.policy_pool) > 0:
+            sampled = self.policy_pool.sample_policy()
+            if sampled and self.verbose > 0:
+                print(
+                    f"[SelfPlay] Step {self.n_calls}: sampled policy v{sampled.version} (ELO: {sampled.elo_rating:.0f})"
+                )
 
     def _save_checkpoint(self):
+        if self.model is None:
+            return
+
+        checkpoint_path = os.path.join(
+            self.log_dir, f"policy_v{self._policy_version}.zip"
+        )
+        self.model.save(checkpoint_path)
+
+        if self.policy_pool is not None:
+            self.policy_pool.add_policy(
+                checkpoint_path, parent_version=self._policy_version - 1
+            )
+
+        self._policy_version += 1
+
         if self.verbose > 0:
-            print(f"Saving checkpoint at step {self.n_calls}")
+            print(
+                f"[SelfPlay] Step {self.n_calls}: saved policy v{self._policy_version}"
+            )
 
 
 class AsyncEvalCallback(BaseCallback):
@@ -327,7 +367,13 @@ def make_sgs_env(config: SGSConfig, seed: int = 0) -> Callable:
 
 
 def create_env(
-    config: SGSConfig, n_envs: int = 1, seed: int = 0, use_subprocess: bool = False
+    config: SGSConfig,
+    n_envs: int = 1,
+    seed: int = 0,
+    use_subprocess: bool = False,
+    norm_reward: bool = False,
+    clip_reward: float = 100.0,
+    gamma: float = 0.99,
 ) -> VecNormalize:
     if n_envs == 1 or not use_subprocess:
         env = DummyVecEnv([make_sgs_env(config, seed + i) for i in range(n_envs)])
@@ -337,10 +383,10 @@ def create_env(
     env = VecNormalize(
         env,
         norm_obs=True,
-        norm_reward=True,
+        norm_reward=norm_reward,
         clip_obs=10.0,
-        clip_reward=10.0,
-        gamma=0.97,
+        clip_reward=clip_reward,
+        gamma=gamma,
         norm_obs_keys=["state"],
     )
     return env
@@ -467,7 +513,14 @@ def train(
 
     vec_normalize_path = os.path.join(config.log_dir, "vec_normalize.pkl")
 
-    env = create_env(sgs_config, config.n_envs, config.seed)
+    env = create_env(
+        sgs_config,
+        config.n_envs,
+        config.seed,
+        norm_reward=config.norm_reward,
+        clip_reward=config.clip_reward,
+        gamma=config.gamma,
+    )
 
     use_masking = config.use_masking and MASKABLE_PPO_AVAILABLE
     model = create_model(env, config, use_masking)
@@ -528,7 +581,12 @@ def train(
     )
     callbacks.append(async_eval_callback)
 
-    self_play_callback = SelfPlayCallback()
+    self_play_callback = SelfPlayCallback(
+        update_freq=25000,
+        save_freq=100000,
+        pool_size=10,
+        log_dir=os.path.join(config.log_dir, "policy_pool"),
+    )
     callbacks.append(self_play_callback)
 
     print(f"Starting training for {config.total_timesteps} timesteps...")
@@ -647,11 +705,11 @@ def main():
     parser.add_argument("--n-eval-episodes", type=int, default=100)
     parser.add_argument("--player-num", type=int, default=5)
     parser.add_argument("--max-rounds", type=int, default=100)
-    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument(
         "--lr-schedule",
         type=str,
-        default="linear_decay",
+        default="cosine",
         choices=[
             "linear_decay",
             "linear_warmup",
@@ -660,7 +718,29 @@ def main():
             "exponential",
             "step",
         ],
-        help="Learning rate schedule: linear_decay (default), linear_warmup, constant, cosine, exponential, step",
+        help="Learning rate schedule: cosine (default), linear_decay, linear_warmup, constant, exponential, step",
+    )
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--gae-lambda", type=float, default=0.98, help="GAE lambda")
+    parser.add_argument(
+        "--ent-coef", type=float, default=0.05, help="Entropy coefficient"
+    )
+    parser.add_argument(
+        "--vf-coef", type=float, default=0.25, help="Value function coefficient"
+    )
+    parser.add_argument(
+        "--n-steps", type=int, default=2048, help="Number of steps per rollout"
+    )
+    parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
+    parser.add_argument(
+        "--n-epochs", type=int, default=10, help="Number of epochs per update"
+    )
+    parser.add_argument("--clip-range", type=float, default=0.2, help="PPO clip range")
+    parser.add_argument(
+        "--norm-reward", action="store_true", default=False, help="Normalize rewards"
+    )
+    parser.add_argument(
+        "--clip-reward", type=float, default=100.0, help="Reward clipping value"
     )
 
     args = parser.parse_args()
@@ -691,6 +771,16 @@ def main():
             model_path=args.model_path,
             learning_rate=args.lr,
             lr_schedule_type=args.lr_schedule,
+            gamma=args.gamma,
+            gae_lambda=args.gae_lambda,
+            ent_coef=args.ent_coef,
+            vf_coef=args.vf_coef,
+            n_steps=args.n_steps,
+            batch_size=args.batch_size,
+            n_epochs=args.n_epochs,
+            clip_range=args.clip_range,
+            norm_reward=args.norm_reward,
+            clip_reward=args.clip_reward,
         )
 
         train(training_config, sgs_config, reset_num_timesteps=not args.resume)

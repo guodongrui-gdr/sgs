@@ -51,6 +51,14 @@ class Player:
     luoyi_active: bool = False
     keji_active: bool = False
 
+    def __eq__(self, other):
+        """安全比较 - 支持 Player 对象和 int 索引比较"""
+        if isinstance(other, Player):
+            return self.idx == other.idx and self.commander_id == other.commander_id
+        if isinstance(other, int):
+            return self.idx == other
+        return NotImplemented
+
     def __post_init__(self):
         if not self.equipment:
             self.equipment = {

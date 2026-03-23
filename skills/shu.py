@@ -120,22 +120,32 @@ class Wusheng(TriggerSkill):
         if not red_cards:
             return event
 
-        if self.ask_player("是否发动【武圣】将红色牌当杀使用?"):
-            if self.player.is_human:
-                # print(f"可选牌: {list(enumerate([str(c) for c in red_cards], 1))}")
+        if not self.ask_player("是否发动【武圣】将红色牌当杀使用?"):
+            return event
+
+        if self.player.is_human:
+            print(f"可选牌: {list(enumerate([str(c) for c in red_cards], 1))}")
+            try:
                 idx = int(input("选择卡牌: ")) - 1
                 if 0 <= idx < len(red_cards):
-                    card = red_cards[idx]
-                    event.data["use_as_sha"] = card
-                    # print(
-                    #     f">>> {self.player.commander_name} 发动【武圣】，将 {card} 当杀使用"
-                    # )
-            else:
-                card = red_cards[0]
-                event.data["use_as_sha"] = card
-                # print(
-                #     f">>> {self.player.commander_name} 发动【武圣】，将 {card} 当杀使用"
-                # )
+                    event.data["use_as_sha"] = red_cards[idx]
+            except ValueError:
+                pass
+        else:
+            from ai.skill_decision import SkillDecisionType
+
+            selected = self.ask_decision(
+                SkillDecisionType.SELECT_CARDS,
+                red_cards,
+                min_selections=1,
+                max_selections=1,
+                default=[0],
+            )
+
+            if selected:
+                idx = selected[0] if isinstance(selected, list) else selected
+                if 0 <= idx < len(red_cards):
+                    event.data["use_as_sha"] = red_cards[idx]
 
         return event
 
@@ -175,39 +185,47 @@ class Guanxing(TriggerSkill):
         if not self.player:
             return event
 
-        if self.ask_player("是否发动【观星】?"):
-            alive_count = min(5, len([p for p in engine.players if p.is_alive]))
-            cards = []
-            for _ in range(alive_count):
-                if engine.deck:
-                    cards.append(engine.deck.pop())
+        if not self.ask_player("是否发动【观星】?"):
+            return event
 
-            if cards:
-                # print(
-                #     f">>> {self.player.commander_name} 发动【观星】，观看了 {len(cards)} 张牌"
-                # )
+        alive_count = min(5, len([p for p in engine.players if p.is_alive]))
+        cards = []
+        for _ in range(alive_count):
+            if engine.deck:
+                cards.append(engine.deck.pop())
 
-                if self.player.is_human:
-                    # print(f"牌堆顶牌: {list(enumerate([str(c) for c in cards], 1))}")
-                    # print("选择放回顺序 (从牌堆顶到底，用逗号分隔):")
-                    order = input("顺序: ")
-                    indices = [
-                        int(x.strip()) - 1 for x in order.split(",") if x.strip()
-                    ]
+        if not cards:
+            return event
 
-                    ordered_cards = []
-                    for idx in indices:
-                        if 0 <= idx < len(cards):
-                            ordered_cards.append(cards[idx])
+        if self.player.is_human:
+            print(f"牌堆顶牌: {list(enumerate([str(c) for c in cards], 1))}")
+            print("选择放回顺序 (从牌堆顶到底，用逗号分隔):")
+            order = input("顺序: ")
+            indices = [int(x.strip()) - 1 for x in order.split(",") if x.strip()]
 
-                    for c in ordered_cards:
-                        engine.deck.append(c)
-                else:
-                    import random
+            ordered_cards = []
+            for idx in indices:
+                if 0 <= idx < len(cards):
+                    ordered_cards.append(cards[idx])
 
-                    random.shuffle(cards)
-                    for c in cards:
-                        engine.deck.append(c)
+            remaining = [c for i, c in enumerate(cards) if i not in indices]
+            ordered_cards.extend(remaining)
+
+            for c in reversed(ordered_cards):
+                engine.deck.append(c)
+        else:
+            order = self.ask_select_order(cards)
+
+            if order is None:
+                import random
+
+                random.shuffle(cards)
+                for c in cards:
+                    engine.deck.append(c)
+            else:
+                ordered_cards = [cards[i] for i in order]
+                for c in reversed(ordered_cards):
+                    engine.deck.append(c)
 
         return event
 
@@ -275,45 +293,73 @@ class Longdan(TriggerSkill):
 
         if event.type == EventType.ASK_FOR_SHAN:
             sha_cards = [c for c in self.player.hand_cards if "杀" in c.name]
-            if sha_cards and self.ask_player("是否发动【龙胆】将杀当闪使用?"):
-                if self.player.is_human:
-                    # print(f"可选牌: {list(enumerate([str(c) for c in sha_cards], 1))}")
+            if not sha_cards:
+                return event
+            if not self.ask_player("是否发动【龙胆】将杀当闪使用?"):
+                return event
+
+            if self.player.is_human:
+                print(f"可选牌: {list(enumerate([str(c) for c in sha_cards], 1))}")
+                try:
                     idx = int(input("选择卡牌: ")) - 1
                     if 0 <= idx < len(sha_cards):
                         card = sha_cards[idx]
                         event.data["shan_used"] = True
                         self.player.hand_cards.remove(card)
                         engine.discard_pile.append(card)
-                        # print(
-                        #     f">>> {self.player.commander_name} 发动【龙胆】，将 {card} 当闪使用"
-                        # )
-                else:
-                    card = sha_cards[0]
-                    event.data["shan_used"] = True
-                    self.player.hand_cards.remove(card)
-                    engine.discard_pile.append(card)
-                    # print(
-                    #     f">>> {self.player.commander_name} 发动【龙胆】，将 {card} 当闪使用"
-                    # )
+                except ValueError:
+                    pass
+            else:
+                from ai.skill_decision import SkillDecisionType
+
+                selected = self.ask_decision(
+                    SkillDecisionType.SELECT_CARDS,
+                    sha_cards,
+                    min_selections=1,
+                    max_selections=1,
+                    default=[0],
+                )
+
+                if selected:
+                    idx = selected[0] if isinstance(selected, list) else selected
+                    if 0 <= idx < len(sha_cards):
+                        card = sha_cards[idx]
+                        event.data["shan_used"] = True
+                        self.player.hand_cards.remove(card)
+                        engine.discard_pile.append(card)
 
         elif event.type in [EventType.BEFORE_USE_CARD, EventType.ASK_FOR_SHA]:
             shan_cards = [c for c in self.player.hand_cards if c.name == "闪"]
-            if shan_cards and self.ask_player("是否发动【龙胆】将闪当杀使用?"):
-                if self.player.is_human:
-                    # print(f"可选牌: {list(enumerate([str(c) for c in shan_cards], 1))}")
+            if not shan_cards:
+                return event
+            if not self.ask_player("是否发动【龙胆】将闪当杀使用?"):
+                return event
+
+            if self.player.is_human:
+                print(f"可选牌: {list(enumerate([str(c) for c in shan_cards], 1))}")
+                try:
                     idx = int(input("选择卡牌: ")) - 1
                     if 0 <= idx < len(shan_cards):
-                        card = shan_cards[idx]
-                        event.data["use_as_sha"] = card
-                        # print(
-                        #     f">>> {self.player.commander_name} 发动【龙胆】，将 {card} 当杀使用"
-                        # )
-                else:
-                    card = shan_cards[0]
-                    event.data["use_as_sha"] = card
-                    # print(
-                    #     f">>> {self.player.commander_name} 发动【龙胆】，将 {card} 当杀使用"
-                    # )
+                        event.data["use_as_sha"] = shan_cards[idx]
+                except ValueError:
+                    pass
+            else:
+                from ai.skill_decision import SkillDecisionType
+
+                selected = self.ask_decision(
+                    SkillDecisionType.SELECT_CARDS,
+                    shan_cards,
+                    min_selections=1,
+                    max_selections=1,
+                    default=[0],
+                )
+
+                if selected:
+                    idx = selected[0] if isinstance(selected, list) else selected
+                    if 0 <= idx < len(shan_cards):
+                        event.data["use_as_sha"] = shan_cards[idx]
+
+        return event
 
         return event
 

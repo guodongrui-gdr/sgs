@@ -14,6 +14,8 @@ from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 from enum import IntEnum
 
+from card.base import is_sha_card
+
 
 class ActionType(IntEnum):
     """动作类型枚举"""
@@ -133,7 +135,20 @@ class ActionEncoder:
 
     def needs_target(self, action_type: int, card=None) -> bool:
         """判断动作是否需要选择目标"""
-        if action_type in [ActionType.RESPOND_TAO, ActionType.USE_SKILL]:
+        if action_type == ActionType.RESPOND_TAO:
+            return True
+
+        if action_type == ActionType.USE_SKILL:
+            # 检查技能是否需要目标
+            if card and hasattr(card, "target_types"):
+                target_types = card.target_types
+                if not target_types:
+                    return False
+                no_selection_types = ["self", "all_players", "all_other_players"]
+                if all(t in no_selection_types for t in target_types):
+                    return False
+                return True
+            # 默认需要目标
             return True
 
         if action_type == ActionType.USE_CARD and card:
@@ -530,7 +545,7 @@ class ActionMaskGenerator:
         if card_name in response_cards:
             return False
 
-        if card_name == "杀":
+        if is_sha_card(card):
             unlimited = (
                 player.unlimited_sha if hasattr(player, "unlimited_sha") else False
             )
@@ -575,7 +590,7 @@ class ActionMaskGenerator:
 
         for p in players:
             if p != player and self._get_attr(p, "is_alive", True):
-                if card_name == "杀" or "杀" in card_name:
+                if is_sha_card(card):
                     if self._is_in_range(player, p):
                         targets.append(p)
                 elif card_name == "顺手牵羊":

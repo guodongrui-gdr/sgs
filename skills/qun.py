@@ -2,6 +2,7 @@ from typing import Optional, List, TYPE_CHECKING
 from skills.base import TriggerSkill, ActiveSkill
 from skills.registry import SkillRegistry
 from engine.event import Event, EventType
+from card.base import is_sha_card
 
 if TYPE_CHECKING:
     from engine.game_engine import GameEngine
@@ -107,38 +108,73 @@ class Qingnang(ActiveSkill):
         if not others:
             return event
 
-        if self.ask_player("是否发动【青囊】?"):
-            if self.player.is_human:
-                # print(
-                #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
-                # )
+        if not self.ask_player("是否发动【青囊】?"):
+            return event
+
+        if self.player.is_human:
+            print(
+                f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
+            )
+            try:
                 card_idx = int(input("选择弃置的牌: ")) - 1
                 if not (0 <= card_idx < len(self.player.hand_cards)):
                     return event
 
-                # print("可选目标:")
+                print("可选目标:")
                 for i, p in enumerate(others, 1):
-                    # print(f"  {i}. {p.commander_name} ({p.current_hp}/{p.max_hp})")
-                    pass
+                    print(f"  {i}. {p.commander_name} ({p.current_hp}/{p.max_hp})")
                 target_idx = int(input("选择目标: ")) - 1
                 if not (0 <= target_idx < len(others)):
                     return event
 
                 card = self.player.hand_cards.pop(card_idx)
                 target = others[target_idx]
+            except ValueError:
+                return event
+        else:
+            from ai.skill_decision import SkillDecisionType
+
+            card_selected = self.ask_decision(
+                SkillDecisionType.SELECT_CARDS,
+                self.player.hand_cards,
+                min_selections=1,
+                max_selections=1,
+                default=[0],
+            )
+
+            target_selected = self.ask_decision(
+                SkillDecisionType.SELECT_TARGETS,
+                others,
+                min_selections=1,
+                max_selections=1,
+                default=[0],
+            )
+
+            if card_selected and target_selected:
+                card_idx = (
+                    card_selected[0]
+                    if isinstance(card_selected, list)
+                    else card_selected
+                )
+                target_idx = (
+                    target_selected[0]
+                    if isinstance(target_selected, list)
+                    else target_selected
+                )
+
+                if 0 <= card_idx < len(
+                    self.player.hand_cards
+                ) and 0 <= target_idx < len(others):
+                    card = self.player.hand_cards.pop(card_idx)
+                    target = others[target_idx]
+                else:
+                    return event
             else:
-                import random
+                return event
 
-                card = random.choice(self.player.hand_cards)
-                self.player.hand_cards.remove(card)
-                target = random.choice(others)
-
-            engine.discard_pile.append(card)
-            target.current_hp = min(target.max_hp, target.current_hp + 1)
-            self.use()
-            # print(
-            #     f">>> {self.player.commander_name} 发动【青囊】，弃置 {card}，令 {target.commander_name} 回复1点体力"
-            # )
+        engine.discard_pile.append(card)
+        target.current_hp = min(target.max_hp, target.current_hp + 1)
+        self.use()
 
         return event
 
@@ -157,18 +193,25 @@ class Wushuang(TriggerSkill):
             return False
         if not event.card:
             return False
-        return event.card.name in ["杀", "决斗"]
+
+        card = event.card
+        is_sha = is_sha_card(card)
+        is_juedou = card.name == "决斗"
+
+        return is_sha or is_juedou
 
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if not self.player or not event.card:
             return event
 
-        if event.card.name == "杀":
+        card = event.card
+
+        if is_sha_card(card):
             event.data["wushuang_sha"] = True
-            # print(f">>> {self.player.commander_name} 的【无双】生效，目标需要出两张闪")
-        elif event.card.name == "决斗":
+            engine.log(f"{self.player.commander_name} 的【无双】生效，目标需要出两张闪")
+        elif card.name == "决斗":
             event.data["wushuang_juedou"] = True
-            # print(f">>> {self.player.commander_name} 的【无双】生效，目标需要出两张杀")
+            engine.log(f"{self.player.commander_name} 的【无双】生效，目标需要出两张杀")
 
         return event
 
@@ -224,58 +267,76 @@ class Lijian(ActiveSkill):
         if len(males) < 2:
             return event
 
-        if self.ask_player("是否发动【离间】?"):
-            if self.player.is_human:
-                # print(
-                #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
-                # )
+        if not self.ask_player("是否发动【离间】?"):
+            return event
+
+        if self.player.is_human:
+            print(
+                f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
+            )
+            try:
                 card_idx = int(input("选择弃置的牌: ")) - 1
                 if not (0 <= card_idx < len(self.player.hand_cards)):
                     return event
 
-                # print("选择出杀的角色:")
+                print("选择出杀的角色:")
                 for i, p in enumerate(males, 1):
-                    # print(f"  {i}. {p.commander_name}")
-                    pass
+                    print(f"  {i}. {p.commander_name}")
                 source_idx = int(input("选择: ")) - 1
                 if not (0 <= source_idx < len(males)):
                     return event
 
                 source = males.pop(source_idx)
 
-                # print("选择被杀的目标:")
+                print("选择被杀的目标:")
                 for i, p in enumerate(males, 1):
-                    # print(f"  {i}. {p.commander_name}")
-                    pass
+                    print(f"  {i}. {p.commander_name}")
                 target_idx = int(input("选择: ")) - 1
                 if not (0 <= target_idx < len(males)):
                     return event
                 target = males[target_idx]
 
                 card = self.player.hand_cards.pop(card_idx)
-            else:
+            except (ValueError, IndexError):
+                return event
+        else:
+            from ai.skill_decision import SkillDecisionType
+
+            card_idx = 0
+            if len(self.player.hand_cards) > 1:
+                card_request = self.ask_decision(
+                    SkillDecisionType.SELECT_CARDS,
+                    self.player.hand_cards,
+                    min_selections=1,
+                    max_selections=1,
+                )
+                if card_request:
+                    card_idx = card_request[0]
+
+            pair = self.ask_select_pair(males)
+
+            if pair is None:
                 import random
 
                 card = random.choice(self.player.hand_cards)
                 self.player.hand_cards.remove(card)
                 source, target = random.sample(males, 2)
-
-            engine.discard_pile.append(card)
-            self.use()
-
-            # print(
-            #     f">>> {self.player.commander_name} 发动【离间】，令 {source.commander_name} 对 {target.commander_name} 使用杀"
-            # )
-
-            sha_cards = [c for c in source.hand_cards if "杀" in c.name]
-            if sha_cards:
-                sha = sha_cards[0]
-                source.hand_cards.remove(sha)
-                engine.card_resolver.resolve_sha(source, target, sha)
-                engine.discard_pile.append(sha)
             else:
-                # print(f"{source.commander_name} 没有杀，受到1点伤害")
-                engine.deal_damage(self.player, source, None, 1, False)
+                card = self.player.hand_cards.pop(card_idx)
+                source = males[pair[0]]
+                target = males[pair[1]] if pair[1] < len(males) else males[0]
+
+        engine.discard_pile.append(card)
+        self.use()
+
+        sha_cards = [c for c in source.hand_cards if "杀" in c.name]
+        if sha_cards:
+            sha = sha_cards[0]
+            source.hand_cards.remove(sha)
+            engine.card_resolver.resolve_sha(source, target, sha)
+            engine.discard_pile.append(sha)
+        else:
+            engine.deal_damage(self.player, source, None, 1, False)
 
         return event
 

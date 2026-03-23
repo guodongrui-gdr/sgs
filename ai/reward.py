@@ -28,30 +28,33 @@ class Identity(Enum):
 class RewardConfig:
     """奖励配置"""
 
-    # 终局奖励
-    victory: float = 100.0
-    defeat: float = -100.0
+    # 终局奖励 (降低以减少方差)
+    victory: float = 10.0
+    defeat: float = -10.0
 
     # 伤害奖励
-    damage_dealt: float = 1.0
-    damage_taken: float = -1.0
+    damage_dealt: float = 0.5
+    damage_taken: float = -0.5
 
-    # 击杀奖励
-    kill_enemy: float = 20.0
-    kill_ally: float = -30.0
-    lord_kill_loyalist: float = -50.0
+    # 击杀奖励 (降低以与伤害奖励成比例)
+    kill_enemy: float = 5.0
+    kill_ally: float = -8.0
+    lord_kill_loyalist: float = -10.0
 
     # 存活奖励
-    survive_per_turn: float = 0.1
+    survive_per_turn: float = 0.05
 
     # 内奸最后存活
-    spy_last_survive: float = 50.0
+    spy_last_survive: float = 5.0
 
     # 使用关键卡牌奖励
-    use_sha_reward: float = 0.5
-    use_tao_reward: float = 1.0
-    use_taoyuan_reward: float = 2.0
-    use_nanman_reward: float = 3.0
+    use_sha_reward: float = 0.2
+    use_tao_reward: float = 0.5
+    use_taoyuan_reward: float = 1.0
+    use_nanman_reward: float = 1.5
+
+    # 奖励裁剪范围
+    clip_reward: float = 20.0
 
 
 @dataclass
@@ -234,10 +237,8 @@ class RewardCalculator:
         return final_reward
 
     def _normalize(self, reward: float) -> float:
-        """归一化奖励 - 保持小的中间奖励不变"""
-        if abs(reward) < 1.0:
-            return reward
-        return np.clip(reward, -5.0, 5.0)
+        """归一化奖励 - 使用配置的裁剪范围"""
+        return np.clip(reward, -self.config.clip_reward, self.config.clip_reward)
 
     def reset(self):
         """重置记录"""

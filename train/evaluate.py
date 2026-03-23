@@ -40,6 +40,7 @@ def evaluate_model(
     render: bool = False,
     verbose: bool = True,
     save_results: bool = False,
+    other_player_policy: str = "rule",
 ):
     """评估模型"""
 
@@ -55,6 +56,7 @@ def evaluate_model(
     config = SGSConfig(
         player_num=player_num,
         max_rounds=max_rounds,
+        other_player_policy=other_player_policy,
     )
 
     env = SGSEnv(config)
@@ -276,6 +278,13 @@ def main():
     parser.add_argument("--compare", action="store_true", help="与随机策略对比")
     parser.add_argument("--identity", type=str, default=None, help="测试特定身份")
     parser.add_argument("--save", action="store_true", help="保存评估结果")
+    parser.add_argument(
+        "--other-player-policy",
+        type=str,
+        default="rule",
+        choices=["none", "rule"],
+        help="其他玩家使用的策略: none(不出牌) 或 rule(规则AI)",
+    )
 
     args = parser.parse_args()
 
@@ -299,6 +308,7 @@ def main():
             args.max_rounds,
             args.render,
             save_results=args.save,
+            other_player_policy=args.other_player_policy,
         )
 
 
