@@ -336,7 +336,7 @@ class Lijian(ActiveSkill):
             engine.card_resolver.resolve_sha(source, target, sha)
             engine.discard_pile.append(sha)
         else:
-            engine.deal_damage(self.player, source, None, 1, False)
+            engine.deal_damage(self.player, source, None, 1, False, False, False)
 
         return event
 

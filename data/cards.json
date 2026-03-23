@@ -87,6 +87,8 @@
     {"type": "WeaponCard", "name": "朱雀羽扇", "color": "方块", "point": 1, "dis": 4, "count": 1},
     {"type": "WeaponCard", "name": "麒麟弓", "color": "红桃", "point": 5, "dis": 5, "count": 1},
     
+    {"type": "WeaponCard", "name": "银月枪", "color": "方块", "point": 12, "dis": 3, "count": 1},
+    
     {"type": "ArmourCard", "name": "八卦阵", "color": "黑桃", "point": 2, "count": 1},
     {"type": "ArmourCard", "name": "八卦阵", "color": "梅花", "point": 2, "count": 1},
     {"type": "ArmourCard", "name": "白银狮子", "color": "梅花", "point": 1, "count": 1},

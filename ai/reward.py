@@ -28,32 +28,25 @@ class Identity(Enum):
 class RewardConfig:
     """奖励配置"""
 
-    # 终局奖励 (降低以减少方差)
-    victory: float = 10.0
-    defeat: float = -10.0
+    victory: float = 50.0
+    defeat: float = -50.0
 
-    # 伤害奖励
-    damage_dealt: float = 0.5
-    damage_taken: float = -0.5
+    damage_dealt: float = 3.0
+    damage_taken: float = -1.0
 
-    # 击杀奖励 (降低以与伤害奖励成比例)
-    kill_enemy: float = 5.0
-    kill_ally: float = -8.0
-    lord_kill_loyalist: float = -10.0
+    kill_enemy: float = 15.0
+    kill_ally: float = -20.0
+    lord_kill_loyalist: float = -30.0
 
-    # 存活奖励
-    survive_per_turn: float = 0.05
+    survive_per_turn: float = 0.5
 
-    # 内奸最后存活
     spy_last_survive: float = 5.0
 
-    # 使用关键卡牌奖励
     use_sha_reward: float = 0.2
     use_tao_reward: float = 0.5
     use_taoyuan_reward: float = 1.0
     use_nanman_reward: float = 1.5
 
-    # 奖励裁剪范围
     clip_reward: float = 20.0
 
 
@@ -324,9 +317,6 @@ class PotentialBasedReward:
         self.prev_potential = 0.0
 
     def calculate_potential(self, state: Dict, player_idx: int) -> float:
-        """
-        计算当前状态的势能 - 不使用隐藏身份信息
-        """
         potential = 0.0
 
         players = state.get("players", [])
@@ -335,20 +325,12 @@ class PotentialBasedReward:
 
         player = players[player_idx]
 
-        # 1. 体力势能 (缩放以减少波动)
         hp_ratio = player.get("current_hp", 0) / max(player.get("max_hp", 1), 1)
-        potential += hp_ratio * 1.0
+        potential += hp_ratio * 5.0
 
-        # 2. 手牌势能
-        hand_count = len(player.get("hand_cards", []))
-        hand_limit = player.get("current_hp", 0)
-        hand_advantage = hand_count - hand_limit
-        potential += hand_advantage * 0.2
-
-        # 3. 装备势能
         equipment = player.get("equipment", {})
         equip_count = sum(1 for v in equipment.values() if v)
-        potential += equip_count * 0.3
+        potential += equip_count * 1.0
 
         return potential
 

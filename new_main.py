@@ -735,7 +735,7 @@ def game_loop(engine: GameEngine, rl_ai: RLAI = None):
 
         if judge_result["lightning_damage"] > 0:
             engine.deal_damage(
-                None, current, None, judge_result["lightning_damage"], True
+                None, current, None, judge_result["lightning_damage"], True, False, True
             )
 
         if not judge_result["skip_draw"]:

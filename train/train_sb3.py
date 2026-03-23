@@ -69,7 +69,7 @@ class TrainingConfig:
         total_timesteps: int = 1_000_000,
         learning_rate: float = 5e-4,
         lr_schedule_type: str = "cosine",
-        n_steps: int = 2048,
+        n_steps: int = 4096,
         batch_size: int = 256,
         n_epochs: int = 10,
         gamma: float = 0.99,

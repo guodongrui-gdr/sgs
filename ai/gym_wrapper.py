@@ -61,9 +61,9 @@ class SGSPhase(IntEnum):
 @dataclass
 class SGSConfig:
     player_num: int = 5
-    max_rounds: int = 100
+    max_rounds: int = 15
     use_action_mask: bool = True
-    use_shaping: bool = False
+    use_shaping: bool = True
     other_player_policy: str = "rule"
 
     state_config: Optional[EncodingConfig] = None
@@ -273,7 +273,13 @@ class SGSEnv(_BaseEnv):
                     f"lightning_damage: {judge_result['lightning_damage']} to player {current.idx}"
                 )
                 self.engine.deal_damage(
-                    None, current, None, judge_result["lightning_damage"], True
+                    None,
+                    current,
+                    None,
+                    judge_result["lightning_damage"],
+                    True,
+                    False,
+                    True,
                 )
 
             if not current.is_alive:
@@ -537,11 +543,23 @@ class SGSEnv(_BaseEnv):
 
         self._total_steps += 1
 
+        # 自动处理技能决策（训练时使用默认策略）
+        while self.skill_decision_context.has_pending_decision():
+            request = self.skill_decision_context.active_request
+            if request is None:
+                break
+            mask = self._get_skill_decision_mask()
+            valid_options = np.where(mask > 0)[0]
+            if len(valid_options) == 0:
+                self.skill_decision_context.clear()
+                break
+            auto_action = valid_options[0]
+            self._handle_skill_decision(int(auto_action))
+
         if self.skill_decision_context.has_pending_decision():
             return self._handle_skill_decision(action)
 
         set_current_env(self)
-
         self._turn_steps += 1
 
         if self._turn_steps > self._max_turn_steps:
@@ -572,7 +590,7 @@ class SGSEnv(_BaseEnv):
         if not valid_action:
             obs = self._get_observation()
             clear_current_env()
-            return obs, -0.1, False, True, {"error": "Invalid action"}
+            return obs, -0.1, False, False, {"error": "Invalid action"}
 
         last_action_type = (
             self.pending_action.action_type if self.pending_action else -1
@@ -870,6 +888,15 @@ class SGSEnv(_BaseEnv):
         while len(player.hand_cards) > hand_limit:
             card = player.hand_cards.pop()
             self.engine.discard_pile.append(card)
+
+        survive_reward = self.reward_system.get_reward(
+            event_type="turn_survive",
+            source_identity="",
+            target_identity=player.identity,
+            current_identity=player.identity,
+            is_target=True,
+        )
+        self._pending_rewards += survive_reward
 
         self.engine.next_turn()
         self.current_player_idx = self.engine.current_player_idx

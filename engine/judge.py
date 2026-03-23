@@ -21,7 +21,10 @@ class JudgeCard:
     success_condition: callable
 
     def check(self, card: "Card") -> JudgeResult:
-        return self.success_condition(card)
+        result = self.success_condition(card)
+        if result:
+            return JudgeResult.SUCCESS
+        return JudgeResult.FAIL
 
 
 JUDGE_CARDS = {
@@ -179,11 +182,22 @@ class DelayedTrickHandler:
         return True
 
     def _calculate_distance(self, source: "Player", target: "Player") -> int:
+        if source == target:
+            return 0
+
         dist = 1
         current = source.next_player
-        while current != target:
+        while current and current != target:
             dist += 1
             current = current.next_player
+
+        reverse_dist = 1
+        current = source.prev_player
+        while current and current != target:
+            reverse_dist += 1
+            current = current.prev_player
+
+        dist = min(dist, reverse_dist)
 
         if source.equipment.get("进攻坐骑"):
             dist = max(1, dist - 1)

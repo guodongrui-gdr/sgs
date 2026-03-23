@@ -518,10 +518,14 @@ class GameEngine:
         self.tmp_cards.remove(card)
 
     def _equip_armour(self, player: "Player", card: "Card"):
-        if player.equipment.get("防具"):
-            self.discard_pile.append(player.equipment["防具"])
+        old_armour = player.equipment.get("防具")
+        if old_armour:
+            if old_armour.name == "白银狮子":
+                if player.current_hp < player.max_hp:
+                    player.current_hp += 1
+                    self.log(f"{player.commander_name} 失去白银狮子，回复1点体力")
+            self.discard_pile.append(old_armour)
         player.equipment["防具"] = card
-        # print(f"{player.commander_name} 装备了 {card.name}")
         self.tmp_cards.remove(card)
 
     def _equip_attack_horse(self, player: "Player", card: "Card"):
@@ -552,9 +556,11 @@ class GameEngine:
         card: Optional["Card"],
         damage: int,
         is_elemental: bool = False,
+        is_fire: bool = False,
+        is_thunder: bool = False,
     ):
         logger.debug(
-            f"deal_damage: target={target.idx}, damage={damage}, is_elemental={is_elemental}"
+            f"deal_damage: target={target.idx}, damage={damage}, is_elemental={is_elemental}, is_fire={is_fire}, is_thunder={is_thunder}"
         )
         event = self._emit_event(
             EventType.DAMAGE_DEALT,
@@ -583,6 +589,7 @@ class GameEngine:
         target.current_hp -= actual_damage
 
         if source:
+            target.last_damage_source = source.idx
             self.log(
                 f"{target.commander_name} 受到 {actual_damage} 点伤害（来自{source.commander_name}），当前体力: {target.current_hp}/{target.max_hp}"
             )
@@ -594,10 +601,13 @@ class GameEngine:
         self._emit_event(EventType.HP_CHANGED, target=target, value=-actual_damage)
 
         if target.current_hp <= 0:
-            self._handle_dying(target)
+            killer_idx = source.idx if source else None
+            self._handle_dying(target, killer_idx)
 
         if is_elemental:
-            self._propagate_chain_damage(source, target, card, actual_damage)
+            self._propagate_chain_damage(
+                source, target, card, actual_damage, is_fire, is_thunder
+            )
 
     def _propagate_chain_damage(
         self,
@@ -605,6 +615,8 @@ class GameEngine:
         original_target: "Player",
         card: Optional["Card"],
         damage: int,
+        is_fire: bool = False,
+        is_thunder: bool = False,
     ):
         logger.debug(
             f"_propagate_chain_damage start: original_target={original_target.idx}"
@@ -636,10 +648,12 @@ class GameEngine:
             if current.is_chained:
                 current.is_chained = False
                 logger.debug(f"  propagating damage to {current.idx}")
-                self.deal_damage(source, current, card, damage, False)
+                self.deal_damage(
+                    source, current, card, damage, True, is_fire, is_thunder
+                )
         logger.debug(f"_propagate_chain_damage end")
 
-    def _handle_dying(self, player: "Player"):
+    def _handle_dying(self, player: "Player", killer_idx: int = None):
         logger.debug(f"_handle_dying: player={player.idx}, hp={player.current_hp}")
         self._emit_event(EventType.PLAYER_DYING, target=player)
 
@@ -655,6 +669,8 @@ class GameEngine:
 
         if not saved and player.current_hp <= 0:
             logger.debug(f"  player {player.idx} died")
+            if killer_idx is not None:
+                player.last_kill = killer_idx
             self._handle_death(player)
 
     def _ask_for_peach(self, responder: "Player", dying_player: "Player") -> bool:
@@ -857,3 +873,13 @@ class GameEngine:
 
         self.phase = GamePhase.TURN_START
         self._emit_event(EventType.TURN_START, source=player)
+
+        self.phase = GamePhase.PREPARE_PHASE
+        self._emit_event(EventType.PREPARE_PHASE, source=player)
+
+    def end_turn(self, player: "Player"):
+        self.phase = GamePhase.END_PHASE
+        self._emit_event(EventType.END_PHASE, source=player)
+
+        self.phase = GamePhase.TURN_END
+        self._emit_event(EventType.TURN_END, source=player)

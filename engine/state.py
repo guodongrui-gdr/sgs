@@ -6,10 +6,12 @@ from enum import Enum
 class GamePhase(Enum):
     WAITING = "waiting"
     TURN_START = "turn_start"
+    PREPARE_PHASE = "prepare_phase"
     JUDGE_PHASE = "judge_phase"
     DRAW_PHASE = "draw_phase"
     PLAY_PHASE = "play_phase"
     DISCARD_PHASE = "discard_phase"
+    END_PHASE = "end_phase"
     TURN_END = "turn_end"
     GAME_OVER = "game_over"
 

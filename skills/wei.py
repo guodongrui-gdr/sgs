@@ -193,7 +193,9 @@ class Ganglie(TriggerSkill):
                             engine.discard_pile.append(card)
                             # print(f"{source.commander_name} 弃置了 {card}")
                         else:
-                            engine.deal_damage(self.player, source, None, 1, False)
+                            engine.deal_damage(
+                                self.player, source, None, 1, False, False, False
+                            )
                     else:
                         if source.hand_cards:
                             import random
@@ -203,7 +205,9 @@ class Ganglie(TriggerSkill):
                             engine.discard_pile.append(card)
                             # print(f"{source.commander_name} 弃置了 {card}")
                         else:
-                            engine.deal_damage(self.player, source, None, 1, False)
+                            engine.deal_damage(
+                                self.player, source, None, 1, False, False, False
+                            )
 
         return event
 

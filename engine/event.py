@@ -10,14 +10,17 @@ class EventType(Enum):
     TURN_START = auto()
     TURN_END = auto()
 
+    PREPARE_PHASE = auto()
+    JUDGE_PHASE = auto()
+    DRAW_PHASE = auto()
+    PLAY_PHASE = auto()
+    DISCARD_PHASE = auto()
+    END_PHASE = auto()
+
     PHASE_START = auto()
     PHASE_END = auto()
 
-    DRAW_PHASE = auto()
     DRAW_CARD = auto()
-
-    PLAY_PHASE = auto()
-    DISCARD_PHASE = auto()
 
     CARD_USED = auto()
     CARD_TARGETED = auto()

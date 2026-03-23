@@ -199,9 +199,15 @@ class CardResolver:
         self, source: "Player", target: "Player", card: "Card", event_data: dict = None
     ) -> bool:
         from engine.event import EventType
+        import random
 
         damage = 1 + source.jiu_effect
         is_elemental = getattr(card, "is_elemental", False)
+        is_fire = getattr(card, "is_fire", False) if card else False
+        is_thunder = getattr(card, "is_thunder", False) if card else False
+
+        weapon = source.equipment.get("武器")
+        weapon_name = weapon.name if weapon else None
 
         ask_event = self.engine._emit_event(
             EventType.ASK_FOR_SHA,
@@ -212,7 +218,9 @@ class CardResolver:
         if ask_event.is_cancelled():
             return False
 
-        if target.equipment.get("防具"):
+        ignore_armour = weapon_name == "青釭剑"
+
+        if target.equipment.get("防具") and not ignore_armour:
             armour = target.equipment["防具"]
             if armour.name == "仁王盾" and card.color in ["黑桃", "梅花"]:
                 self.engine.log(f"仁王盾生效，黑杀无效!")
@@ -221,12 +229,47 @@ class CardResolver:
                 self.engine.log(f"藤甲生效，普通杀无效!")
                 return False
 
+        if weapon_name == "雌雄双股剑":
+            if source.gender != target.gender and target.gender:
+                if source.is_human:
+                    choice = input(f"发动雌雄双股剑？对方弃牌(1)/你摸牌(2): ")
+                    if choice == "1":
+                        if target.hand_cards:
+                            discard = random.choice(target.hand_cards)
+                            target.hand_cards.remove(discard)
+                            self.engine.discard_pile.append(discard)
+                            self.engine.log(
+                                f"雌雄双股剑：{target.commander_name} 弃置了一张牌"
+                            )
+                    elif choice == "2":
+                        drawn = self.engine.draw_cards(source, 1)
+                        source.hand_cards.extend(drawn)
+                        self.engine.log(
+                            f"雌雄双股剑：{source.commander_name} 摸了一张牌"
+                        )
+                else:
+                    if random.random() < 0.5 and target.hand_cards:
+                        discard = random.choice(target.hand_cards)
+                        target.hand_cards.remove(discard)
+                        self.engine.discard_pile.append(discard)
+                        self.engine.log(
+                            f"雌雄双股剑：{target.commander_name} 弃置了一张牌"
+                        )
+                    else:
+                        drawn = self.engine.draw_cards(source, 1)
+                        source.hand_cards.extend(drawn)
+                        self.engine.log(
+                            f"雌雄双股剑：{source.commander_name} 摸了一张牌"
+                        )
+
         wushuang_active = event_data and event_data.get("wushuang_sha", False)
         shan_needed = 2 if wushuang_active else 1
 
-        if target.equipment.get("防具") and target.equipment["防具"].name == "八卦阵":
-            import random
-
+        if (
+            target.equipment.get("防具")
+            and target.equipment["防具"].name == "八卦阵"
+            and not ignore_armour
+        ):
             judge_card = self.engine.deck.pop() if self.engine.deck else None
             if judge_card:
                 self.engine.discard_pile.append(judge_card)
@@ -261,26 +304,154 @@ class CardResolver:
             )
 
         if shan_played >= shan_needed:
-            if wushuang_active:
-                self.engine.log(
-                    f"{target.commander_name} 打出了{shan_played}张闪，躲避了杀（无双）"
-                )
-            return False
+            if weapon_name == "贯石斧":
+                if len(source.hand_cards) >= 2:
+                    if source.is_human:
+                        choice = input("发动贯石斧，弃置两张牌强命？(y/n): ")
+                        if choice.lower() == "y":
+                            for _ in range(2):
+                                if source.hand_cards:
+                                    discard = source.hand_cards.pop()
+                                    self.engine.discard_pile.append(discard)
+                            self.engine.log(
+                                f"{source.commander_name} 发动贯石斧，杀依然生效!"
+                            )
+                            shan_played = 0
+                    else:
+                        if random.random() < 0.7:
+                            for _ in range(2):
+                                if source.hand_cards:
+                                    discard = source.hand_cards.pop()
+                                    self.engine.discard_pile.append(discard)
+                            self.engine.log(
+                                f"{source.commander_name} 发动贯石斧，杀依然生效!"
+                            )
+                            shan_played = 0
+
+            if weapon_name == "青龙偃月刀" and shan_played >= shan_needed:
+                sha_cards = [c for c in source.hand_cards if "杀" in c.name]
+                if sha_cards:
+                    if source.is_human:
+                        choice = input("发动青龙偃月刀，追杀？(y/n): ")
+                        if choice.lower() == "y":
+                            new_sha = sha_cards[0]
+                            source.hand_cards.remove(new_sha)
+                            self.engine.log(
+                                f"{source.commander_name} 发动青龙偃月刀追杀!"
+                            )
+                            return self.resolve_sha(source, target, new_sha, event_data)
+                    else:
+                        if random.random() < 0.5:
+                            new_sha = sha_cards[0]
+                            source.hand_cards.remove(new_sha)
+                            self.engine.log(
+                                f"{source.commander_name} 发动青龙偃月刀追杀!"
+                            )
+                            return self.resolve_sha(source, target, new_sha, event_data)
+
+            if shan_played >= shan_needed:
+                if wushuang_active:
+                    self.engine.log(
+                        f"{target.commander_name} 打出了{shan_played}张闪，躲避了杀（无双）"
+                    )
+                return False
 
         actual_damage = damage
+
+        if weapon_name == "古锭刀" and len(target.hand_cards) == 0:
+            actual_damage += 1
+            self.engine.log(f"{source.commander_name} 发动古锭刀，伤害+1!")
+
         if (
             target.equipment.get("防具")
             and target.equipment["防具"].name == "藤甲"
-            and is_elemental
+            and is_fire
+            and not ignore_armour
         ):
             actual_damage += 1
             self.engine.log(f"{target.commander_name} 穿着藤甲，火焰伤害+1!")
-        if target.equipment.get("防具") and target.equipment["防具"].name == "白银狮子":
-            actual_damage = max(1, actual_damage - 1)
-            self.engine.log(f"{target.commander_name} 穿着白银狮子，伤害-1!")
+        if (
+            target.equipment.get("防具")
+            and target.equipment["防具"].name == "白银狮子"
+            and actual_damage > 1
+            and not ignore_armour
+        ):
+            actual_damage = 1
+            self.engine.log(f"{target.commander_name} 穿着白银狮子，伤害改为1!")
 
-        self.engine.deal_damage(source, target, card, actual_damage, is_elemental)
+        ice_sword_used = False
+        if weapon_name == "寒冰剑" and (
+            target.hand_cards
+            or target.equipment.get("武器")
+            or target.equipment.get("防具")
+            or target.equipment.get("进攻坐骑")
+            or target.equipment.get("防御坐骑")
+        ):
+            if source.is_human:
+                choice = input("发动寒冰剑，防止伤害并弃置对方两张牌？(y/n): ")
+                if choice.lower() == "y":
+                    ice_sword_used = True
+                    self._ice_sword_discard(source, target, 2)
+            else:
+                if random.random() < 0.7:
+                    ice_sword_used = True
+                    self._ice_sword_discard(source, target, 2)
+
+        if not ice_sword_used:
+            if weapon_name == "麒麟弓":
+                mount = target.equipment.get("进攻坐骑") or target.equipment.get(
+                    "防御坐骑"
+                )
+                if mount:
+                    if source.is_human:
+                        choice = input(f"发动麒麟弓，弃置{mount.name}？(y/n): ")
+                        if choice.lower() == "y":
+                            self._qilin_discard(target)
+                    else:
+                        self._qilin_discard(target)
+
+            self.engine.deal_damage(
+                source, target, card, actual_damage, is_elemental, is_fire, is_thunder
+            )
         return True
+
+    def _ice_sword_discard(self, source: "Player", target: "Player", count: int):
+        import random
+
+        discarded = 0
+        while discarded < count:
+            options = []
+            if target.hand_cards:
+                options.append(("hand", None))
+            for slot, card in target.equipment.items():
+                if card:
+                    options.append(("equip", slot))
+            if not options:
+                break
+            choice_type, slot = random.choice(options)
+            if choice_type == "hand":
+                card = random.choice(target.hand_cards)
+                target.hand_cards.remove(card)
+                self.engine.discard_pile.append(card)
+                self.engine.log(f"寒冰剑弃置了 {target.commander_name} 的 {card}")
+            else:
+                card = target.equipment[slot]
+                target.equipment[slot] = None
+                self.engine.discard_pile.append(card)
+                self.engine.log(f"寒冰剑弃置了 {target.commander_name} 的 {card.name}")
+            discarded += 1
+
+    def _qilin_discard(self, target: "Player"):
+        if target.equipment.get("进攻坐骑"):
+            card = target.equipment["进攻坐骑"]
+            target.equipment["进攻坐骑"] = None
+            self.engine.discard_pile.append(card)
+            self.engine.log(f"麒麟弓弃置了 {target.commander_name} 的 {card.name}")
+        elif target.equipment.get("防御坐骑"):
+            card = target.equipment["防御坐骑"]
+            target.equipment["防御坐骑"] = None
+            self.engine.discard_pile.append(card)
+            self.engine.log(f"麒麟弓弃置了 {target.commander_name} 的 {card.name}")
 
     def resolve_juedou(self, source: "Player", target: "Player") -> bool:
         # print(f"\n{source.commander_name} 对 {target.commander_name} 发起决斗!")
@@ -322,7 +493,7 @@ class CardResolver:
             loser = target
 
         if loser:
-            self.engine.deal_damage(source, loser, None, 1, False)
+            self.engine.deal_damage(source, loser, None, 1, False, False, False)
             return True
 
         return False
@@ -405,7 +576,7 @@ class CardResolver:
                 self.engine.discard_pile.append(shan)
                 # print(f"{player.commander_name} 打出了闪")
             else:
-                self.engine.deal_damage(source, player, None, 1, False)
+                self.engine.deal_damage(source, player, None, 1, False, False, False)
                 damaged_players.append(player)
 
         return damaged_players
@@ -459,7 +630,7 @@ class CardResolver:
             source.hand_cards.remove(discard)
             self.engine.discard_pile.append(discard)
             # print(f"{source.commander_name} 弃置了 {discard}")
-            self.engine.deal_damage(source, target, None, 1, True)
+            self.engine.deal_damage(source, target, None, 1, True, True, False)
             return True
 
         return False
@@ -494,7 +665,12 @@ class CardResolver:
 
             dist = self._calculate_distance(target, kill_target)
             if dist <= target.attack_range:
-                self.engine.deal_damage(target, kill_target, sha, 1, False)
+                is_fire = getattr(sha, "is_fire", False)
+                is_thunder = getattr(sha, "is_thunder", False)
+                is_elemental = is_fire or is_thunder
+                self.engine.deal_damage(
+                    target, kill_target, sha, 1, is_elemental, is_fire, is_thunder
+                )
                 self.engine.discard_pile.append(sha)
                 return True
             else:
@@ -516,9 +692,17 @@ class CardResolver:
 
         dist = 1
         current = source.next_player
-        while current != target:
+        while current and current != target:
             dist += 1
             current = current.next_player
+
+        reverse_dist = 1
+        current = source.prev_player
+        while current and current != target:
+            reverse_dist += 1
+            current = current.prev_player
+
+        dist = min(dist, reverse_dist)
 
         if source.equipment.get("进攻坐骑"):
             dist = max(1, dist - 1)
