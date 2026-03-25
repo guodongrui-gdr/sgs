@@ -9,7 +9,6 @@
 
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Any, Callable
-import multiprocessing as mp
 
 try:
     from stable_baselines3.common.vec_env import (

@@ -167,7 +167,6 @@ class ResponseSystem:
             response = self.ask_for_response(player, request)
 
             if response:
-                # print(f">>> {player.commander_name} 使用无懈可击!")
                 player.hand_cards.remove(response)
                 self.engine.discard_pile.append(response)
 
@@ -178,13 +177,11 @@ class ResponseSystem:
 
                 if not countered:
                     if wuxie_count == 0:
-                        # print(
                         #     f">>> 无懈可击生效，{target_card.name if hasattr(target_card, 'name') else target_card} 被抵消!"
                         # )
                         pass
                     return True
                 else:
-                    # print(f">>> {player.commander_name} 的无懈可击被抵消!")
                     return False
 
         return False
@@ -454,7 +451,6 @@ class CardResolver:
             self.engine.log(f"麒麟弓弃置了 {target.commander_name} 的 {card.name}")
 
     def resolve_juedou(self, source: "Player", target: "Player") -> bool:
-        # print(f"\n{source.commander_name} 对 {target.commander_name} 发起决斗!")
 
         if self.response_system.ask_for_wuxie(
             source, type("MockCard", (), {"name": "决斗"})(), target
@@ -482,7 +478,6 @@ class CardResolver:
 
             current.hand_cards.remove(sha)
             self.engine.discard_pile.append(sha)
-            # print(f"{current.commander_name} 打出了杀")
 
             current = source if current == target else target
 
@@ -499,7 +494,6 @@ class CardResolver:
         return False
 
     def resolve_namaninru(self, source: "Player") -> List["Player"]:
-        # print(f"\n{source.commander_name} 使用南蛮入侵!")
 
         if self.response_system.ask_for_wuxie(
             source, type("MockCard", (), {"name": "南蛮入侵"})()
@@ -528,7 +522,6 @@ class CardResolver:
             if sha:
                 player.hand_cards.remove(sha)
                 self.engine.discard_pile.append(sha)
-                # print(f"{player.commander_name} 打出了杀")
             else:
                 self.engine.deal_damage(source, player, None, 1, False)
                 damaged_players.append(player)
@@ -537,7 +530,6 @@ class CardResolver:
 
     def resolve_wanjianqifa(self, source: "Player") -> List["Player"]:
         from engine.event import EventType
-        # print(f"\n{source.commander_name} 使用万箭齐发!")
 
         if self.response_system.ask_for_wuxie(
             source, type("MockCard", (), {"name": "万箭齐发"})()
@@ -574,7 +566,6 @@ class CardResolver:
             if shan:
                 player.hand_cards.remove(shan)
                 self.engine.discard_pile.append(shan)
-                # print(f"{player.commander_name} 打出了闪")
             else:
                 self.engine.deal_damage(source, player, None, 1, False, False, False)
                 damaged_players.append(player)
@@ -582,7 +573,6 @@ class CardResolver:
         return damaged_players
 
     def resolve_huogong(self, source: "Player", target: "Player") -> bool:
-        # print(f"\n{source.commander_name} 对 {target.commander_name} 使用火攻!")
 
         if self.response_system.ask_for_wuxie(
             source, type("MockCard", (), {"name": "火攻"})(), target
@@ -590,11 +580,9 @@ class CardResolver:
             return False
 
         if not target.hand_cards:
-            # print(f"{target.commander_name} 没有手牌")
             return False
 
         if target.is_human:
-            # print(
             #     f"\n你的手牌: {list(enumerate([str(c) for c in target.hand_cards], 1))}"
             # )
             idx = int(input("选择一张牌展示: ")) - 1
@@ -608,17 +596,13 @@ class CardResolver:
 
             show_card = random.choice(target.hand_cards)
 
-        # print(f"{target.commander_name} 展示了 {show_card}")
 
         source_cards = [c for c in source.hand_cards if c.color == show_card.color]
         if not source_cards:
-            # print(f"{source.commander_name} 没有相同花色的牌")
             return False
 
         if source.is_human:
             available = list(enumerate([str(c) for c in source_cards], 1))
-            # print(f"\n可弃置的牌: {available}")
-            # print("输入 0 跳过")
             idx = int(input("选择: ")) - 1
             if idx < 0:
                 return False
@@ -629,7 +613,6 @@ class CardResolver:
         if discard:
             source.hand_cards.remove(discard)
             self.engine.discard_pile.append(discard)
-            # print(f"{source.commander_name} 弃置了 {discard}")
             self.engine.deal_damage(source, target, None, 1, True, True, False)
             return True
 
@@ -643,7 +626,6 @@ class CardResolver:
         card: "Card",
     ) -> bool:
         if not target.equipment.get("武器"):
-            # print(f"{target.commander_name} 没有武器")
             return False
 
         if self.response_system.ask_for_wuxie(
@@ -661,7 +643,6 @@ class CardResolver:
 
         if sha:
             target.hand_cards.remove(sha)
-            # print(f"{target.commander_name} 打出了杀")
 
             dist = self._calculate_distance(target, kill_target)
             if dist <= target.attack_range:
@@ -674,14 +655,12 @@ class CardResolver:
                 self.engine.discard_pile.append(sha)
                 return True
             else:
-                # print(f"距离不够，无法对 {kill_target.commander_name} 出杀")
                 target.hand_cards.append(sha)
                 return False
         else:
             weapon = target.equipment["武器"]
             source.hand_cards.append(weapon)
             target.equipment["武器"] = None
-            # print(
             #     f"{target.commander_name} 将 {weapon.name} 交给了 {source.commander_name}"
             # )
             return True

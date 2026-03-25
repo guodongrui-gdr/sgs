@@ -41,18 +41,18 @@ class Jiuji(ActiveSkill):
         red_cards = [c for c in self.player.hand_cards if c.is_red()]
 
         if self.player.is_human:
-            # print(f"可选牌: {list(enumerate([str(c) for c in red_cards], 1))}")
+            print(f"可选牌: {list(enumerate([str(c) for c in red_cards], 1))}")
             idx = int(input("选择卡牌当桃使用: ")) - 1
             if 0 <= idx < len(red_cards):
                 card = red_cards[idx]
                 event.data["use_as_tao"] = card
-                # print(
-                #     f">>> {self.player.commander_name} 发动【急救】，将 {card} 当桃使用"
-                # )
+                print(
+                    f">>> {self.player.commander_name} 发动【急救】，将 {card} 当桃使用"
+                )
         else:
             card = red_cards[0]
             event.data["use_as_tao"] = card
-            # print(f">>> {self.player.commander_name} 发动【急救】，将 {card} 当桃使用")
+            print(f">>> {self.player.commander_name} 发动【急救】，将 {card} 当桃使用")
 
         return event
 
@@ -360,8 +360,8 @@ class Biyue(TriggerSkill):
         if self.ask_player("是否发动【闭月】摸一张牌?"):
             drawn = engine.draw_cards(self.player, 1)
             self.player.hand_cards.extend(drawn)
-            # print(
-            #     f">>> {self.player.commander_name} 发动【闭月】，摸了 {drawn[0] if drawn else '牌'}"
-            # )
+            print(
+                f">>> {self.player.commander_name} 发动【闭月】，摸了 {drawn[0] if drawn else '牌'}"
+            )
 
         return event

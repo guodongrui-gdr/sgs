@@ -42,7 +42,7 @@ def evaluate_model(
     save_results: bool = False,
     other_player_policy: str = "rule",
 ):
-    """评估模型"""
+    """评估模型（控制单个玩家）"""
 
     try:
         from sb3_contrib import MaskablePPO
@@ -214,6 +214,156 @@ def evaluate_model(
     return results
 
 
+def evaluate_model_self_play(
+    model_path: str,
+    n_episodes: int = 100,
+    player_num: int = 5,
+    max_rounds: int = 100,
+    render: bool = False,
+    verbose: bool = True,
+    save_results: bool = False,
+):
+    """模型自我对战评估 - 所有玩家都由模型控制"""
+
+    try:
+        from sb3_contrib import MaskablePPO
+
+        use_masking = True
+    except ImportError:
+        from stable_baselines3 import PPO as MaskablePPO
+
+        use_masking = False
+
+    config = SGSConfig(
+        player_num=player_num,
+        max_rounds=max_rounds,
+        other_player_policy="none",
+    )
+
+    env = SGSEnv(config)
+    model = MaskablePPO.load(model_path, env=env)
+
+    results = {
+        "model_path": model_path,
+        "mode": "self_play",
+        "timestamp": datetime.now().isoformat(),
+        "total_episodes": n_episodes,
+        "faction_wins": {
+            "主公忠臣": 0,
+            "反贼": 0,
+            "内奸": 0,
+        },
+        "identity_wins": {
+            "主公": 0,
+            "忠臣": 0,
+            "反贼": 0,
+            "内奸": 0,
+        },
+        "game_lengths": [],
+        "total_rounds": [],
+        "win_by_round": {},
+    }
+
+    print(f"\n{'=' * 60}")
+    print(f"模型自我对战: {model_path}")
+    print(f"对局数: {n_episodes}")
+    print(f"{'=' * 60}\n")
+
+    for episode in range(n_episodes):
+        obs, _ = env.reset(seed=episode)
+        done = False
+        step_count = 0
+
+        while not done:
+            if use_masking:
+                if hasattr(env, "action_masks"):
+                    action_masks = env.action_masks()
+                elif hasattr(env, "get_attr"):
+                    action_masks = env.get_attr("action_masks")[0]
+                else:
+                    action_masks = _get_action_masks_from_obs(obs)
+                action, _ = model.predict(
+                    obs, action_masks=action_masks, deterministic=True
+                )
+            else:
+                action, _ = model.predict(obs, deterministic=True)
+
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
+            step_count += 1
+
+            if render and step_count % 10 == 0:
+                env.render()
+
+        results["game_lengths"].append(step_count)
+
+        winner = info.get("winner", "unknown")
+        round_num = info.get("round_num", 0)
+        if round_num > 0:
+            results["total_rounds"].append(round_num)
+
+        if winner == "主公":
+            results["faction_wins"]["主公忠臣"] += 1
+            results["identity_wins"]["主公"] += 1
+        elif winner == "反贼":
+            results["faction_wins"]["反贼"] += 1
+            results["identity_wins"]["反贼"] += 1
+        elif winner == "内奸":
+            results["faction_wins"]["内奸"] += 1
+            results["identity_wins"]["内奸"] += 1
+
+        if round_num > 0:
+            results["win_by_round"][winner] = results["win_by_round"].get(winner, 0) + 1
+
+        if verbose and (episode + 1) % 10 == 0:
+            print(
+                f"Episode {episode + 1}/{n_episodes} | "
+                f"Winner: {winner} | "
+                f"Rounds: {round_num} | "
+                f"Steps: {step_count}"
+            )
+
+    results["avg_game_length"] = np.mean(results["game_lengths"])
+    results["avg_rounds"] = (
+        np.mean(results["total_rounds"]) if results["total_rounds"] else 0
+    )
+
+    print(f"\n{'=' * 60}")
+    print("自我对战结果")
+    print(f"{'=' * 60}")
+    print(f"总对局: {results['total_episodes']}")
+    print(f"平均步数: {results['avg_game_length']:.1f}")
+    print(f"平均回合数: {results['avg_rounds']:.1f}")
+
+    print(f"\n阵营胜率:")
+    total = results["total_episodes"]
+    for faction, wins in results["faction_wins"].items():
+        win_rate = wins / total if total > 0 else 0
+        print(f"  {faction}: {wins}/{total} ({win_rate:.1%})")
+
+    print(f"\n身份胜率:")
+    for identity, wins in results["identity_wins"].items():
+        win_rate = wins / total if total > 0 else 0
+        print(f"  {identity}: {wins}/{total} ({win_rate:.1%})")
+
+    if save_results:
+        results_path = (
+            Path(model_path).parent
+            / f"self_play_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
+        serializable_results = {
+            k: v
+            for k, v in results.items()
+            if isinstance(v, (str, int, float, list, dict))
+        }
+        with open(results_path, "w", encoding="utf-8") as f:
+            json.dump(serializable_results, f, ensure_ascii=False, indent=2)
+        print(f"\n结果已保存到: {results_path}")
+
+    env.close()
+    return results
+
+
 def compare_with_random(
     model_path: str,
     n_episodes: int = 50,
@@ -285,10 +435,25 @@ def main():
         choices=["none", "rule"],
         help="其他玩家使用的策略: none(不出牌) 或 rule(规则AI)",
     )
+    parser.add_argument(
+        "--self-play",
+        action="store_true",
+        help="模型自我对战模式（所有玩家由模型控制）",
+    )
 
     args = parser.parse_args()
 
-    if args.compare:
+    if args.self_play:
+        evaluate_model_self_play(
+            args.model_path,
+            args.n_episodes,
+            args.player_num,
+            args.max_rounds,
+            args.render,
+            verbose=True,
+            save_results=args.save,
+        )
+    elif args.compare:
         compare_with_random(
             args.model_path,
             args.n_episodes,

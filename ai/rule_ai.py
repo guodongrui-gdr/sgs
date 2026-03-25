@@ -80,9 +80,6 @@ class RuleAI:
         ):
             return ActionType.USE_SKILL
 
-        if ActionType.EQUIP in valid_types and self._has_equipment(player):
-            return ActionType.EQUIP
-
         if ActionType.END_TURN in valid_types:
             return ActionType.END_TURN
 
@@ -170,13 +167,6 @@ class RuleAI:
     def _can_use_skill(self, player: Player, game_state: Dict) -> bool:
         """判断是否能使用技能"""
         return len(player.skills) > 0 and random.random() < 0.3
-
-    def _has_equipment(self, player: Player) -> bool:
-        """判断是否有装备牌"""
-        for card in player.hand_cards:
-            if hasattr(card, "card_type") and "Weapon" in str(type(card)):
-                return True
-        return False
 
     def _evaluate_card(self, card: Card, player: Player, game_state: Dict) -> float:
         """评估卡牌价值"""

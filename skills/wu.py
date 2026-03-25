@@ -38,13 +38,13 @@ class Zhiheng(ActiveSkill):
         if not self.player:
             return event
 
-        # print(f">>> {self.player.commander_name} 发动【制衡】")
+        print(f">>> {self.player.commander_name} 发动【制衡】")
 
         if self.player.is_human:
-            # print(
-            #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
-            # )
-            # print("选择弃置的牌 (用逗号分隔，0结束):")
+            print(
+                f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
+            )
+            print("选择弃置的牌 (用逗号分隔，0结束):")
             indices = [
                 int(x.strip()) - 1
                 for x in input().split(",")
@@ -71,7 +71,7 @@ class Zhiheng(ActiveSkill):
             drawn = engine.draw_cards(self.player, len(cards_to_discard))
             self.player.hand_cards.extend(drawn)
             self.use()
-            # print(f">>> 弃置了 {len(cards_to_discard)} 张牌，摸了 {len(drawn)} 张牌")
+            print(f">>> 弃置了 {len(cards_to_discard)} 张牌，摸了 {len(drawn)} 张牌")
 
         return event
 
@@ -154,7 +154,7 @@ class Keji(TriggerSkill):
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if self.player and self.player.sha_count == 0:
             self.player.keji_active = True
-            # print(f">>> {self.player.commander_name} 的【克己】生效，本回合不用弃牌")
+            print(f">>> {self.player.commander_name} 的【克己】生效，本回合不用弃牌")
             event.cancel()
         return event
 
@@ -186,11 +186,11 @@ class Kurou(ActiveSkill):
 
         if self.ask_player("是否发动【苦肉】?"):
             self.player.current_hp -= 1
-            # print(f">>> {self.player.commander_name} 发动【苦肉】，失去1点体力")
+            print(f">>> {self.player.commander_name} 发动【苦肉】，失去1点体力")
 
             drawn = engine.draw_cards(self.player, 2)
             self.player.hand_cards.extend(drawn)
-            # print(f">>> 摸了 {len(drawn)} 张牌")
+            print(f">>> 摸了 {len(drawn)} 张牌")
 
         return event
 
@@ -210,7 +210,7 @@ class Yingzi(TriggerSkill):
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if self.player:
             self.player.cards_to_draw = 3
-            # print(f">>> {self.player.commander_name} 的【英姿】生效，摸牌阶段多摸一张")
+            print(f">>> {self.player.commander_name} 的【英姿】生效，摸牌阶段多摸一张")
         return event
 
 
@@ -251,16 +251,16 @@ class Fanjian(ActiveSkill):
             return event
 
         if self.player.is_human:
-            # print(
-            #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
-            # )
+            print(
+                f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
+            )
             card_idx = int(input("选择要展示的牌: ")) - 1
             if not (0 <= card_idx < len(self.player.hand_cards)):
                 return event
 
-            # print("可选目标:")
+            print("可选目标:")
             for i, p in enumerate(others, 1):
-                # print(f"  {i}. {p.commander_name}")
+                print(f"  {i}. {p.commander_name}")
                 pass
             target_idx = int(input("选择目标: ")) - 1
             if not (0 <= target_idx < len(others)):
@@ -275,41 +275,41 @@ class Fanjian(ActiveSkill):
             self.player.hand_cards.remove(card)
             target = random.choice(others)
 
-        # print(
-        #     f">>> {self.player.commander_name} 发动【反间】，展示 {card} 并交给 {target.commander_name}"
-        # )
+        print(
+            f">>> {self.player.commander_name} 发动【反间】，展示 {card} 并交给 {target.commander_name}"
+        )
         target.hand_cards.append(card)
 
         target_color = card.color
 
         if target.is_human:
-            # print(f"你获得了 {card}，花色为 {target_color}")
-            # print("1. 展示手牌并弃置相同花色的牌")
-            # print("2. 失去1点体力")
+            print(f"你获得了 {card}，花色为 {target_color}")
+            print("1. 展示手牌并弃置相同花色的牌")
+            print("2. 失去1点体力")
             choice = input("选择: ")
 
             if choice == "1":
                 same_color = [c for c in target.hand_cards if c.color == target_color]
                 if same_color:
-                    # print(f"弃置: {same_color}")
+                    print(f"弃置: {same_color}")
                     for c in same_color:
                         target.hand_cards.remove(c)
                         engine.discard_pile.append(c)
             else:
                 target.current_hp -= 1
-                # print(f"{target.commander_name} 失去1点体力")
+                print(f"{target.commander_name} 失去1点体力")
         else:
             import random
 
             same_color = [c for c in target.hand_cards if c.color == target_color]
             if len(same_color) <= 1 and target.current_hp > 1:
                 target.current_hp -= 1
-                # print(f"{target.commander_name} 选择失去1点体力")
+                print(f"{target.commander_name} 选择失去1点体力")
             elif same_color:
                 for c in same_color:
                     target.hand_cards.remove(c)
                     engine.discard_pile.append(c)
-                # print(f"{target.commander_name} 弃置了 {len(same_color)} 张牌")
+                print(f"{target.commander_name} 弃置了 {len(same_color)} 张牌")
 
         self.use()
         return event
@@ -490,9 +490,9 @@ class Qianxun(TriggerSkill):
 
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if self.player:
-            # print(
-            #     f">>> {self.player.commander_name} 的【谦逊】生效，不能成为顺手牵羊和乐不思蜀的目标"
-            # )
+            print(
+                f">>> {self.player.commander_name} 的【谦逊】生效，不能成为顺手牵羊和乐不思蜀的目标"
+            )
             event.cancel()
         return event
 
@@ -522,9 +522,9 @@ class Lianying(TriggerSkill):
             x = min(len(alive), event.value if event.value else 1)
 
             if self.player.is_human:
-                # print(f"可选 {x} 名角色")
+                print(f"可选 {x} 名角色")
                 for i, p in enumerate(alive, 1):
-                    # print(f"  {i}. {p.commander_name}")
+                    print(f"  {i}. {p.commander_name}")
                     pass
                 indices = [
                     int(x.strip()) - 1
@@ -540,7 +540,7 @@ class Lianying(TriggerSkill):
             for target in targets:
                 drawn = engine.draw_cards(target, 1)
                 target.hand_cards.extend(drawn)
-                # print(f">>> {target.commander_name} 摸了 {drawn[0] if drawn else '牌'}")
+                print(f">>> {target.commander_name} 摸了 {drawn[0] if drawn else '牌'}")
 
         return event
 

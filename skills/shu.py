@@ -35,7 +35,7 @@ class Rende(ActiveSkill):
         if not self.player or not self.player.hand_cards:
             return event
 
-        # print(f">>> {self.player.commander_name} 发动【仁德】")
+        print(f">>> {self.player.commander_name} 发动【仁德】")
 
         given_count = 0
         while self.player.hand_cards:
@@ -44,14 +44,14 @@ class Rende(ActiveSkill):
                 break
 
             if self.player.is_human:
-                # print(
-                #     f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
-                # )
-                # print("可选目标:")
+                print(
+                    f"手牌: {list(enumerate([str(c) for c in self.player.hand_cards], 1))}"
+                )
+                print("可选目标:")
                 for i, p in enumerate(others, 1):
-                    # print(f"  {i}. {p.commander_name}")
+                    print(f"  {i}. {p.commander_name}")
                     pass
-                # print("输入 0 结束")
+                print("输入 0 结束")
 
                 try:
                     card_idx = int(input("选择卡牌: ")) - 1
@@ -64,7 +64,7 @@ class Rende(ActiveSkill):
                         card = self.player.hand_cards.pop(card_idx)
                         others[target_idx].hand_cards.append(card)
                         given_count += 1
-                        # print(f"将 {card} 交给 {others[target_idx].commander_name}")
+                        print(f"将 {card} 交给 {others[target_idx].commander_name}")
                 except ValueError:
                     break
             else:
@@ -77,13 +77,13 @@ class Rende(ActiveSkill):
                 self.player.hand_cards.remove(card)
                 target.hand_cards.append(card)
                 given_count += 1
-                # print(f"将 {card} 交给 {target.commander_name}")
+                print(f"将 {card} 交给 {target.commander_name}")
 
         if given_count >= 2 and self.player.current_hp < self.player.max_hp:
             self.player.current_hp += 1
-            # print(
-            #     f">>> {self.player.commander_name} 给出了 {given_count} 张牌，回复1点体力"
-            # )
+            print(
+                f">>> {self.player.commander_name} 给出了 {given_count} 张牌，回复1点体力"
+            )
 
         return event
 
@@ -165,7 +165,7 @@ class Paoxiao(TriggerSkill):
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if self.player:
             self.player.unlimited_sha = True
-            # print(f">>> {self.player.commander_name} 的【咆哮】生效，可出任意数量的杀")
+            print(f">>> {self.player.commander_name} 的【咆哮】生效，可出任意数量的杀")
         return event
 
 
@@ -254,9 +254,9 @@ class Kongcheng(TriggerSkill):
 
     def execute(self, event: Event, engine: "GameEngine") -> Optional[Event]:
         if self.player and not self.player.hand_cards:
-            # print(
-            #     f">>> {self.player.commander_name} 的【空城】生效，不能成为杀或决斗的目标"
-            # )
+            print(
+                f">>> {self.player.commander_name} 的【空城】生效，不能成为杀或决斗的目标"
+            )
             event.cancel()
         return event
 
@@ -408,15 +408,15 @@ class Tieqi(TriggerSkill):
             judge_card = engine.deck.pop() if engine.deck else None
             if judge_card:
                 engine.discard_pile.append(judge_card)
-                # print(
-                #     f">>> {self.player.commander_name} 发动【铁骑】，判定结果: {judge_card}"
-                # )
+                print(
+                    f">>> {self.player.commander_name} 发动【铁骑】，判定结果: {judge_card}"
+                )
 
                 if judge_card.color in ["红桃", "方块"]:
                     event.data["tieqi_success"] = True
-                    # print(f">>> 判定为红色，此杀不可被闪响应！")
+                    print(f">>> 判定为红色，此杀不可被闪响应！")
                 else:
-                    # print(f">>> 判定为黑色，铁骑失败")
+                    print(f">>> 判定为黑色，铁骑失败")
                     pass
 
         return event

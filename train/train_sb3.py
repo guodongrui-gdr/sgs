@@ -117,16 +117,36 @@ class TrainingConfig:
         self.norm_reward = norm_reward
         self.clip_reward = clip_reward
         self.normalize_advantage = normalize_advantage
+        self._resume_from_timesteps = 0
+        self._total_timesteps_with_resume = total_timesteps
 
     def _default_log_dir(self) -> str:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return str(Path(__file__).parent / "logs" / f"sgs_{timestamp}")
 
-    def get_lr_schedule(self):
+    def get_lr_schedule(
+        self, resume_from_timesteps: int = 0, total_timesteps: int = None
+    ):
+        total = total_timesteps or self._total_timesteps_with_resume
+        if resume_from_timesteps > 0 and total > 0:
+            initial_progress = resume_from_timesteps / (resume_from_timesteps + total)
+        else:
+            initial_progress = 0.0
+
         if self.lr_schedule_type == "linear_decay":
-            return get_linear_fn(self.learning_rate, self.learning_rate * 0.1, 1.0)
+            base_schedule = get_linear_fn(
+                self.learning_rate, self.learning_rate * 0.1, 1.0
+            )
+            return lambda progress_remaining: base_schedule(
+                max(0.0, progress_remaining)
+            )
         elif self.lr_schedule_type == "linear_warmup":
-            return get_linear_fn(self.learning_rate * 0.1, self.learning_rate, 1.0)
+            base_schedule = get_linear_fn(
+                self.learning_rate * 0.1, self.learning_rate, 1.0
+            )
+            return lambda progress_remaining: base_schedule(
+                max(0.0, progress_remaining)
+            )
         elif self.lr_schedule_type == "constant":
             return constant_fn(self.learning_rate)
         elif self.lr_schedule_type == "cosine":
@@ -141,7 +161,16 @@ class TrainingConfig:
     def _cosine_schedule(self, progress_remaining: float) -> float:
         import math
 
-        progress = 1.0 - progress_remaining
+        if self._resume_from_timesteps > 0 and self._total_timesteps_with_resume > 0:
+            total_steps = (
+                self._resume_from_timesteps + self._total_timesteps_with_resume
+            )
+            initial_progress = self._resume_from_timesteps / total_steps
+            progress = initial_progress + (1.0 - initial_progress) * (
+                1.0 - progress_remaining
+            )
+        else:
+            progress = 1.0 - progress_remaining
         return self.learning_rate * 0.1 + (
             self.learning_rate - self.learning_rate * 0.1
         ) * 0.5 * (1 + math.cos(math.pi * progress))
@@ -149,18 +178,51 @@ class TrainingConfig:
     def _exponential_schedule(self, progress_remaining: float) -> float:
         import math
 
-        progress = 1.0 - progress_remaining
+        if self._resume_from_timesteps > 0 and self._total_timesteps_with_resume > 0:
+            total_steps = (
+                self._resume_from_timesteps + self._total_timesteps_with_resume
+            )
+            initial_progress = self._resume_from_timesteps / total_steps
+            progress = initial_progress + (1.0 - initial_progress) * (
+                1.0 - progress_remaining
+            )
+        else:
+            progress = 1.0 - progress_remaining
         gamma = 0.95
         return self.learning_rate * (gamma ** (progress * 10))
 
     def _step_schedule(self, progress_remaining: float) -> float:
-        progress = 1.0 - progress_remaining
+        if self._resume_from_timesteps > 0 and self._total_timesteps_with_resume > 0:
+            total_steps = (
+                self._resume_from_timesteps + self._total_timesteps_with_resume
+            )
+            initial_progress = self._resume_from_timesteps / total_steps
+            progress = initial_progress + (1.0 - initial_progress) * (
+                1.0 - progress_remaining
+            )
+        else:
+            progress = 1.0 - progress_remaining
         if progress < 0.33:
             return self.learning_rate
         elif progress < 0.66:
             return self.learning_rate * 0.5
         else:
             return self.learning_rate * 0.1
+
+
+class StopTrainingOnStepsCallback(BaseCallback):
+    def __init__(self, target_timesteps: int, verbose: int = 0):
+        super().__init__(verbose)
+        self.target_timesteps = target_timesteps
+
+    def _on_step(self) -> bool:
+        if self.num_timesteps >= self.target_timesteps:
+            if self.verbose > 0:
+                print(
+                    f"Stopping training at {self.num_timesteps} steps (target: {self.target_timesteps})"
+                )
+            return False
+        return True
 
 
 class SelfPlayCallback(BaseCallback):
@@ -523,18 +585,40 @@ def train(
     )
 
     use_masking = config.use_masking and MASKABLE_PPO_AVAILABLE
+
+    resume_steps = getattr(config, "_resume_from_timesteps", 0)
+    if resume_steps > 0 and not reset_num_timesteps:
+        config._total_timesteps_with_resume = config.total_timesteps
+        config.total_timesteps = config.total_timesteps + resume_steps
+        print(
+            f"Adjusting total_timesteps for LR schedule: {resume_steps} (resumed) + {config._total_timesteps_with_resume} (new) = {config.total_timesteps}"
+        )
+
     model = create_model(env, config, use_masking)
 
     if config.model_path and os.path.exists(config.model_path):
         print(f"Loading model from {config.model_path}")
         if use_masking and MASKABLE_PPO_AVAILABLE:
-            model = MaskablePPO.load(config.model_path, env=env)
+            loaded_model = MaskablePPO.load(config.model_path, env=env)
         elif config.algorithm == "ppo":
-            model = PPO.load(config.model_path, env=env)
+            loaded_model = PPO.load(config.model_path, env=env)
         elif config.algorithm == "dqn":
-            model = DQN.load(config.model_path, env=env)
+            loaded_model = DQN.load(config.model_path, env=env)
         elif config.algorithm == "a2c":
-            model = A2C.load(config.model_path, env=env)
+            loaded_model = A2C.load(config.model_path, env=env)
+        else:
+            loaded_model = None
+
+        if loaded_model is not None:
+            model = loaded_model
+            if resume_steps > 0:
+                lr_schedule = config.get_lr_schedule(
+                    resume_steps, config._total_timesteps_with_resume
+                )
+                model.learning_rate = lr_schedule
+                print(
+                    f"Updated learning rate schedule for resumed training (base LR: {config.learning_rate}, initial progress: {resume_steps / (resume_steps + config._total_timesteps_with_resume) * 100:.1f}%)"
+                )
 
         if not reset_num_timesteps:
             import re
@@ -550,6 +634,14 @@ def train(
                 print(f"Loaded VecNormalize stats from {vec_normalize_path}")
 
     callbacks = []
+
+    target_timesteps = config.total_timesteps
+    if resume_steps > 0 and not reset_num_timesteps:
+        target_timesteps = resume_steps + config._total_timesteps_with_resume
+        stop_callback = StopTrainingOnStepsCallback(
+            target_timesteps=target_timesteps, verbose=1
+        )
+        callbacks.append(stop_callback)
 
     checkpoint_callback = CheckpointCallback(
         save_freq=config.checkpoint_freq,
@@ -589,11 +681,17 @@ def train(
     )
     callbacks.append(self_play_callback)
 
-    print(f"Starting training for {config.total_timesteps} timesteps...")
+    print(
+        f"Starting training for {config._total_timesteps_with_resume if resume_steps > 0 else config.total_timesteps} timesteps..."
+    )
     print(f"Log directory: {config.log_dir}")
     print(f"Algorithm: {config.algorithm}")
     print(f"Use masking: {use_masking}")
-    if not reset_num_timesteps:
+    if resume_steps > 0 and not reset_num_timesteps:
+        print(
+            f"Resuming from {resume_steps} steps, total training will reach {config.total_timesteps} steps"
+        )
+    elif not reset_num_timesteps:
         print(f"Resuming training (keeping timesteps counter)")
 
     model.learn(
@@ -761,7 +859,7 @@ def main():
                 print(f"Resuming from {resume_from_timesteps} timesteps")
 
         training_config = TrainingConfig(
-            total_timesteps=args.timesteps + resume_from_timesteps,
+            total_timesteps=args.timesteps,
             n_envs=args.n_envs,
             algorithm=args.algorithm,
             use_masking=args.use_masking,
@@ -782,6 +880,7 @@ def main():
             norm_reward=args.norm_reward,
             clip_reward=args.clip_reward,
         )
+        training_config._resume_from_timesteps = resume_from_timesteps
 
         train(training_config, sgs_config, reset_num_timesteps=not args.resume)
 

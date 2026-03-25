@@ -33,7 +33,7 @@ class JianXiong(TriggerSkill):
                 self.player.hand_cards.append(event.card)
                 if event.card in engine.tmp_cards:
                     engine.tmp_cards.remove(event.card)
-                # print(f">>> {self.player.commander_name} 发动【奸雄】获得 {event.card}")
+                print(f">>> {self.player.commander_name} 发动【奸雄】获得 {event.card}")
         return event
 
 
@@ -140,9 +140,9 @@ class Fankui(TriggerSkill):
                             source.equipment[slot] = None
                             break
                 self.player.hand_cards.append(card)
-                # print(
-                #     f">>> {self.player.commander_name} 发动【反馈】获得 {source.commander_name} 的 {card}"
-                # )
+                print(
+                    f">>> {self.player.commander_name} 发动【反馈】获得 {source.commander_name} 的 {card}"
+                )
 
         return event
 
@@ -173,17 +173,17 @@ class Ganglie(TriggerSkill):
             judge_card = engine.deck.pop() if engine.deck else None
             if judge_card:
                 engine.discard_pile.append(judge_card)
-                # print(
-                #     f">>> {self.player.commander_name} 发动【刚烈】，判定结果: {judge_card}"
-                # )
+                print(
+                    f">>> {self.player.commander_name} 发动【刚烈】，判定结果: {judge_card}"
+                )
 
                 if judge_card.color != "红桃":
                     source = event.source
-                    # print(f">>> {source.commander_name} 需要弃置一张手牌或受到1点伤害")
+                    print(f">>> {source.commander_name} 需要弃置一张手牌或受到1点伤害")
 
                     if source.is_human:
-                        # print("1. 弃置一张手牌")
-                        # print("2. 受到1点伤害")
+                        print("1. 弃置一张手牌")
+                        print("2. 受到1点伤害")
                         choice = input("选择: ")
                         if choice == "1" and source.hand_cards:
                             import random
@@ -191,7 +191,7 @@ class Ganglie(TriggerSkill):
                             card = random.choice(source.hand_cards)
                             source.hand_cards.remove(card)
                             engine.discard_pile.append(card)
-                            # print(f"{source.commander_name} 弃置了 {card}")
+                            print(f"{source.commander_name} 弃置了 {card}")
                         else:
                             engine.deal_damage(
                                 self.player, source, None, 1, False, False, False
@@ -203,7 +203,7 @@ class Ganglie(TriggerSkill):
                             card = random.choice(source.hand_cards)
                             source.hand_cards.remove(card)
                             engine.discard_pile.append(card)
-                            # print(f"{source.commander_name} 弃置了 {card}")
+                            print(f"{source.commander_name} 弃置了 {card}")
                         else:
                             engine.deal_damage(
                                 self.player, source, None, 1, False, False, False
@@ -245,9 +245,9 @@ class Tuxi(TriggerSkill):
             ]
 
             if self.player.is_human:
-                # print("可选目标:")
+                print("可选目标:")
                 for i, p in enumerate(others, 1):
-                    # print(f"  {i}. {p.commander_name} ({len(p.hand_cards)}张手牌)")
+                    print(f"  {i}. {p.commander_name} ({len(p.hand_cards)}张手牌)")
                     pass
 
                 targets = []
@@ -272,9 +272,9 @@ class Tuxi(TriggerSkill):
                     card = random.choice(target.hand_cards)
                     target.hand_cards.remove(card)
                     self.player.hand_cards.append(card)
-                    # print(
-                    #     f">>> {self.player.commander_name} 发动【突袭】获得 {target.commander_name} 的 {card}"
-                    # )
+                    print(
+                        f">>> {self.player.commander_name} 发动【突袭】获得 {target.commander_name} 的 {card}"
+                    )
 
             event.cancel()
             return None
@@ -303,7 +303,7 @@ class Luoyi(TriggerSkill):
         if self.ask_player("是否发动【裸衣】?"):
             self.player.luoyi_active = True
             self.player.cards_to_draw = 1
-            # print(f">>> {self.player.commander_name} 发动【裸衣】，少摸一张牌，伤害+1")
+            print(f">>> {self.player.commander_name} 发动【裸衣】，少摸一张牌，伤害+1")
 
         return event
 
@@ -333,7 +333,7 @@ class Tiandu(TriggerSkill):
             self.player.hand_cards.append(event.card)
             if event.card in engine.discard_pile:
                 engine.discard_pile.remove(event.card)
-            # print(f">>> {self.player.commander_name} 发动【天妒】获得 {event.card}")
+            print(f">>> {self.player.commander_name} 发动【天妒】获得 {event.card}")
 
         return event
 
@@ -426,19 +426,19 @@ class Luoshen(TriggerSkill):
             return event
 
         if self.ask_player("是否发动【洛神】?"):
-            # print(f">>> {self.player.commander_name} 发动【洛神】")
+            print(f">>> {self.player.commander_name} 发动【洛神】")
             while True:
                 if not engine.deck:
                     break
 
                 judge_card = engine.deck.pop()
                 engine.discard_pile.append(judge_card)
-                # print(f"判定结果: {judge_card}")
+                print(f"判定结果: {judge_card}")
 
                 if judge_card.color in ["黑桃", "梅花"]:
                     self.player.hand_cards.append(judge_card)
                     engine.discard_pile.remove(judge_card)
-                    # print(f"{self.player.commander_name} 获得 {judge_card}")
+                    print(f"{self.player.commander_name} 获得 {judge_card}")
 
                     if not self.ask_player("是否继续判定?"):
                         break
