@@ -5,6 +5,7 @@
 ## 项目目标
 
 训练一个强化学习模型 (MaskablePPO) 来玩三国杀卡牌游戏。关键特性：
+
 - 让 RL 参与技能内部决策（如观星的牌序选择、遗计的分配等）
 - 分步输出技能决策，而非一次性决定
 
@@ -24,6 +25,7 @@
 ### 训练状态: ✅ 正常运行
 
 最近一次成功训练 (2026-03-23 15:33):
+
 - 训练步数: 100K timesteps
 - ep_rew_mean: 正常波动 (-0.64 → 2.75 → 0.58)
 - ep_len_mean: ~220-250 步
@@ -36,20 +38,21 @@
 
 根据 RULES.md 官方规则文档，修复了多项与规则不一致的问题：
 
-| 优先级 | 问题 | 状态 |
-|--------|------|------|
-| P0 | 白银狮子伤害计算错误（减1→改为1） | ✅ 已修复 |
-| P0 | 白银狮子失去回血效果缺失 | ✅ 已修复 |
-| P0 | 判定返回值类型错误 | ✅ 已修复 |
-| P1 | 藤甲对雷电伤害错误+1 | ✅ 已修复 |
-| P1 | 铁索传递伤害丢失属性 | ✅ 已修复 |
-| P1 | 距离计算未取双向最小值 | ✅ 已修复 |
-| P2 | 缺少银月枪卡牌 | ✅ 已修复 |
-| P2 | 武器技能未实现 | ✅ 已修复 |
-| P2 | 铁索连环重铸 | ✅ 已存在 |
-| P3 | 回合阶段不完整 | ✅ 已修复 |
+| 优先级 | 问题                 | 状态    |
+|-----|--------------------|-------|
+| P0  | 白银狮子伤害计算错误（减1→改为1） | ✅ 已修复 |
+| P0  | 白银狮子失去回血效果缺失       | ✅ 已修复 |
+| P0  | 判定返回值类型错误          | ✅ 已修复 |
+| P1  | 藤甲对雷电伤害错误+1        | ✅ 已修复 |
+| P1  | 铁索传递伤害丢失属性         | ✅ 已修复 |
+| P1  | 距离计算未取双向最小值        | ✅ 已修复 |
+| P2  | 缺少银月枪卡牌            | ✅ 已修复 |
+| P2  | 武器技能未实现            | ✅ 已修复 |
+| P2  | 铁索连环重铸             | ✅ 已存在 |
+| P3  | 回合阶段不完整            | ✅ 已修复 |
 
 **武器技能实现**：
+
 - 青釭剑：无视防具
 - 雌雄双股剑：杀异性目标效果
 - 寒冰剑：弃置对方牌代替伤害
@@ -59,6 +62,7 @@
 - 麒麟弓：弃置坐骑
 
 **修改的文件**：
+
 - `engine/game_engine.py` - 白银狮子、回合阶段
 - `engine/response.py` - 伤害计算、距离计算、武器技能
 - `engine/judge.py` - 判定返回值、距离计算
@@ -72,6 +76,7 @@
 **问题**：当技能（如观星）触发时，环境会等待 RL 提供决策输入，但 RL 不知道如何响应，导致训练卡住。
 
 **解决方案**：在 `step()` 方法中添加自动处理逻辑：
+
 ```python
 # 自动处理技能决策（训练时使用默认策略）
 while self.skill_decision_context.has_pending_decision():
@@ -94,6 +99,7 @@ while self.skill_decision_context.has_pending_decision():
 **问题**：`event.source == self.player` 当 source 是 int 时会崩溃。
 
 **解决方案**：添加 `__eq__` 方法支持 int 比较：
+
 ```python
 def __eq__(self, other):
     if isinstance(other, Player):
@@ -108,6 +114,7 @@ def __eq__(self, other):
 **问题**：无效动作返回 `truncated=True`，导致 Monitor 错误地在第 1 步就结束 episode。
 
 **解决方案**：改为返回 `truncated=False`：
+
 ```python
 # 修复前
 return obs, -0.1, False, True, {"error": "Invalid action"}
@@ -124,6 +131,7 @@ return obs, -0.1, False, False, {"error": "Invalid action"}
 文件: `ai/skill_decision.py`
 
 决策类型：
+
 ```python
 class SkillDecisionType(IntEnum):
     YES_NO = 1        # 是/否决策
@@ -135,24 +143,25 @@ class SkillDecisionType(IntEnum):
 
 ### 已重构的技能
 
-| 技能 | 武将 | 决策类型 | 文件 |
-|------|------|----------|------|
+| 技能 | 武将  | 决策类型         | 文件            |
+|----|-----|--------------|---------------|
 | 观星 | 诸葛亮 | SELECT_ORDER | skills/shu.py |
-| 遗计 | 郭嘉 | DISTRIBUTE | skills/wei.py |
-| 离间 | 貂蝉 | SELECT_PAIR | skills/qun.py |
+| 遗计 | 郭嘉  | DISTRIBUTE   | skills/wei.py |
+| 离间 | 貂蝉  | SELECT_PAIR  | skills/qun.py |
 | 鬼才 | 司马懿 | SELECT_CARDS | skills/wei.py |
-| 青囊 | 华佗 | SELECT_CARDS | skills/qun.py |
-| 武圣 | 关羽 | SELECT_CARDS | skills/shu.py |
-| 龙胆 | 赵云 | SELECT_CARDS | skills/shu.py |
-| 倾国 | 甄姬 | SELECT_CARDS | skills/wei.py |
-| 奇袭 | 甘宁 | SELECT_CARDS | skills/wu.py |
-| 国色 | 大乔 | SELECT_CARDS | skills/wu.py |
-| 流离 | 小乔 | SELECT_CARDS | skills/wu.py |
-| 结姻 | 孙尚香 | SELECT_CARDS | skills/wu.py |
+| 青囊 | 华佗  | SELECT_CARDS | skills/qun.py |
+| 武圣 | 关羽  | SELECT_CARDS | skills/shu.py |
+| 龙胆 | 赵云  | SELECT_CARDS | skills/shu.py |
+| 倾国 | 甄姬  | SELECT_CARDS | skills/wei.py |
+| 奇袭 | 甘宁  | SELECT_CARDS | skills/wu.py  |
+| 国色 | 大乔  | SELECT_CARDS | skills/wu.py  |
+| 流离 | 小乔  | SELECT_CARDS | skills/wu.py  |
+| 结姻 | 孙尚香 | SELECT_CARDS | skills/wu.py  |
 
 ### 观察空间扩展
 
 在 `ai/gym_wrapper.py` 中添加了技能决策相关的观察：
+
 ```python
 obs["skill_decision_type"] = int(request.decision_type)  # 决策类型
 obs["skill_decision_mask"] = self._get_skill_decision_mask()  # 有效选项掩码
@@ -201,32 +210,32 @@ SGSConfig:
 
 ### 核心文件
 
-| 文件 | 用途 |
-|------|------|
-| `ai/gym_wrapper.py` | Gym 环境包装器，动作空间、观察空间、奖励计算 |
-| `ai/skill_decision.py` | 技能决策框架，决策类型、请求结构、缓存机制 |
-| `ai/reward.py` | 奖励配置和计算 |
-| `ai/action_encoder.py` | 动作编码/解码 |
-| `ai/action_mask.py` | 动作掩码生成 |
-| `train/train_sb3.py` | 训练脚本入口 |
+| 文件                     | 用途                       |
+|------------------------|--------------------------|
+| `ai/gym_wrapper.py`    | Gym 环境包装器，动作空间、观察空间、奖励计算 |
+| `ai/skill_decision.py` | 技能决策框架，决策类型、请求结构、缓存机制    |
+| `ai/reward.py`         | 奖励配置和计算                  |
+| `ai/action_encoder.py` | 动作编码/解码                  |
+| `ai/action_mask.py`    | 动作掩码生成                   |
+| `train/train_sb3.py`   | 训练脚本入口                   |
 
 ### 游戏引擎
 
-| 文件 | 用途 |
-|------|------|
-| `engine/game_engine.py` | 游戏引擎核心 |
-| `engine/event.py` | 事件类型定义 |
-| `engine/event_bus.py` | 事件总线（技能触发） |
-| `engine/state.py` | 游戏状态序列化 |
+| 文件                      | 用途         |
+|-------------------------|------------|
+| `engine/game_engine.py` | 游戏引擎核心     |
+| `engine/event.py`       | 事件类型定义     |
+| `engine/event_bus.py`   | 事件总线（技能触发） |
+| `engine/state.py`       | 游戏状态序列化    |
 
 ### 技能文件
 
-| 文件 | 武将 |
-|------|------|
-| `skills/shu.py` | 蜀国武将：诸葛亮、关羽、张飞、赵云、马超、黄月英 |
-| `skills/wei.py` | 魏国武将：曹操、司马懿、郭嘉、甄姬、许褚、夏侯惇 |
-| `skills/wu.py` | 吴国武将：孙权、甘宁、吕蒙、黄盖、周瑜、大乔、陆逊、孙尚香、小乔 |
-| `skills/qun.py` | 群雄武将：吕布、貂蝉、华佗 |
+| 文件              | 武将                               |
+|-----------------|----------------------------------|
+| `skills/shu.py` | 蜀国武将：诸葛亮、关羽、张飞、赵云、马超、黄月英         |
+| `skills/wei.py` | 魏国武将：曹操、司马懿、郭嘉、甄姬、许褚、夏侯惇         |
+| `skills/wu.py`  | 吴国武将：孙权、甘宁、吕蒙、黄盖、周瑜、大乔、陆逊、孙尚香、小乔 |
+| `skills/qun.py` | 群雄武将：吕布、貂蝉、华佗                    |
 
 ---
 
@@ -257,6 +266,7 @@ SystemError: Objects/dictobject.c:1605: bad argument to internal function
 3. **Buffer 更新慢**：Monitor 的 ep_rew_mean buffer 更新不够频繁
 
 **解决方案**：
+
 - 减少 `max_rounds` (100 → 15)
 - 增加 `n_steps` (2048 → 4096)
 - 确保技能决策不阻塞环境
@@ -290,20 +300,20 @@ SystemError: Objects/dictobject.c:1605: bad argument to internal function
 ## 下一步计划
 
 1. **让 RL 参与技能决策**
-   - 当前自动处理是临时方案
-   - 需要扩展动作空间，让 RL 输出技能决策
+    - 当前自动处理是临时方案
+    - 需要扩展动作空间，让 RL 输出技能决策
 
 2. **解决偶发性 SystemError**
-   - 添加更多调试信息
-   - 检查 `to_dict()` 中的数据类型
+    - 添加更多调试信息
+    - 检查 `to_dict()` 中的数据类型
 
 3. **长期训练**
-   - 训练更长时间 (1M+ timesteps)
-   - 观察奖励曲线是否持续上升
+    - 训练更长时间 (1M+ timesteps)
+    - 观察奖励曲线是否持续上升
 
 4. **实现银月枪技能**
-   - 当前只添加了卡牌，技能尚未实现
-   - 规则：你的回合外，每当你使用一张黑色手牌，可立即对攻击范围内一名角色使用一张杀
+    - 当前只添加了卡牌，技能尚未实现
+    - 规则：你的回合外，每当你使用一张黑色手牌，可立即对攻击范围内一名角色使用一张杀
 
 ---
 

@@ -1,175 +1,1032 @@
 {
   "cards": [
-    {"type": "BasicCard", "name": "杀", "color": "黑桃", "point": 7, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "黑桃", "point": 8, "count": 2},
-    {"type": "BasicCard", "name": "杀", "color": "黑桃", "point": 9, "count": 2},
-    {"type": "BasicCard", "name": "杀", "color": "黑桃", "point": 10, "count": 2},
-    {"type": "BasicCard", "name": "杀", "color": "红桃", "point": 10, "count": 2},
-    {"type": "BasicCard", "name": "杀", "color": "红桃", "point": 11, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 2, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 3, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 4, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 5, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 6, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 7, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 8, "count": 2},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 9, "count": 2},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 10, "count": 2},
-    {"type": "BasicCard", "name": "杀", "color": "梅花", "point": 11, "count": 2},
-    {"type": "BasicCard", "name": "杀", "color": "方块", "point": 6, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "方块", "point": 7, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "方块", "point": 8, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "方块", "point": 9, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "方块", "point": 10, "count": 1},
-    {"type": "BasicCard", "name": "杀", "color": "方块", "point": 13, "count": 1},
-    
-    {"type": "FireSha", "name": "火杀", "color": "红桃", "point": 4, "count": 1},
-    {"type": "FireSha", "name": "火杀", "color": "红桃", "point": 7, "count": 1},
-    {"type": "FireSha", "name": "火杀", "color": "红桃", "point": 10, "count": 1},
-    {"type": "FireSha", "name": "火杀", "color": "方块", "point": 4, "count": 1},
-    {"type": "FireSha", "name": "火杀", "color": "方块", "point": 5, "count": 1},
-    
-    {"type": "ThunderSha", "name": "雷杀", "color": "黑桃", "point": 4, "count": 1},
-    {"type": "ThunderSha", "name": "雷杀", "color": "黑桃", "point": 5, "count": 1},
-    {"type": "ThunderSha", "name": "雷杀", "color": "黑桃", "point": 6, "count": 1},
-    {"type": "ThunderSha", "name": "雷杀", "color": "黑桃", "point": 7, "count": 1},
-    {"type": "ThunderSha", "name": "雷杀", "color": "黑桃", "point": 8, "count": 1},
-    {"type": "ThunderSha", "name": "雷杀", "color": "梅花", "point": 5, "count": 1},
-    {"type": "ThunderSha", "name": "雷杀", "color": "梅花", "point": 6, "count": 1},
-    {"type": "ThunderSha", "name": "雷杀", "color": "梅花", "point": 7, "count": 1},
-    {"type": "ThunderSha", "name": "雷杀", "color": "梅花", "point": 8, "count": 1},
-    
-    {"type": "BasicCard", "name": "闪", "color": "红桃", "point": 2, "count": 2},
-    {"type": "BasicCard", "name": "闪", "color": "红桃", "point": 8, "count": 1},
-    {"type": "BasicCard", "name": "闪", "color": "红桃", "point": 9, "count": 1},
-    {"type": "BasicCard", "name": "闪", "color": "红桃", "point": 11, "count": 1},
-    {"type": "BasicCard", "name": "闪", "color": "红桃", "point": 12, "count": 1},
-    {"type": "BasicCard", "name": "闪", "color": "红桃", "point": 13, "count": 1},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 2, "count": 2},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 3, "count": 1},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 4, "count": 1},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 5, "count": 1},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 6, "count": 2},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 7, "count": 2},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 8, "count": 2},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 9, "count": 1},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 10, "count": 2},
-    {"type": "BasicCard", "name": "闪", "color": "方块", "point": 11, "count": 3},
-    
-    {"type": "BasicCard", "name": "桃", "color": "红桃", "point": 3, "count": 1},
-    {"type": "BasicCard", "name": "桃", "color": "红桃", "point": 4, "count": 1},
-    {"type": "BasicCard", "name": "桃", "color": "红桃", "point": 5, "count": 1},
-    {"type": "BasicCard", "name": "桃", "color": "红桃", "point": 6, "count": 2},
-    {"type": "BasicCard", "name": "桃", "color": "红桃", "point": 7, "count": 1},
-    {"type": "BasicCard", "name": "桃", "color": "红桃", "point": 8, "count": 1},
-    {"type": "BasicCard", "name": "桃", "color": "红桃", "point": 9, "count": 1},
-    {"type": "BasicCard", "name": "桃", "color": "红桃", "point": 12, "count": 1},
-    {"type": "BasicCard", "name": "桃", "color": "方块", "point": 2, "count": 1},
-    {"type": "BasicCard", "name": "桃", "color": "方块", "point": 3, "count": 1},
-    {"type": "BasicCard", "name": "桃", "color": "方块", "point": 12, "count": 1},
-    
-    {"type": "BasicCard", "name": "酒", "color": "黑桃", "point": 3, "count": 1},
-    {"type": "BasicCard", "name": "酒", "color": "黑桃", "point": 9, "count": 1},
-    {"type": "BasicCard", "name": "酒", "color": "梅花", "point": 3, "count": 1},
-    {"type": "BasicCard", "name": "酒", "color": "梅花", "point": 9, "count": 1},
-    {"type": "BasicCard", "name": "酒", "color": "方块", "point": 9, "count": 1},
-    
-    {"type": "WeaponCard", "name": "诸葛连弩", "color": "梅花", "point": 1, "dis": 1, "count": 1},
-    {"type": "WeaponCard", "name": "诸葛连弩", "color": "方块", "point": 1, "dis": 1, "count": 1},
-    {"type": "WeaponCard", "name": "雌雄双股剑", "color": "黑桃", "point": 2, "dis": 2, "count": 1},
-    {"type": "WeaponCard", "name": "寒冰剑", "color": "黑桃", "point": 2, "dis": 2, "count": 1},
-    {"type": "WeaponCard", "name": "青釭剑", "color": "黑桃", "point": 2, "dis": 2, "count": 1},
-    {"type": "WeaponCard", "name": "古锭刀", "color": "黑桃", "point": 2, "dis": 2, "count": 1},
-    {"type": "WeaponCard", "name": "青龙偃月刀", "color": "黑桃", "point": 5, "dis": 3, "count": 1},
-    {"type": "WeaponCard", "name": "贯石斧", "color": "方块", "point": 5, "dis": 3, "count": 1},
-    {"type": "WeaponCard", "name": "丈八蛇矛", "color": "黑桃", "point": 12, "dis": 3, "count": 1},
-    {"type": "WeaponCard", "name": "方天画戟", "color": "方块", "point": 12, "dis": 4, "count": 1},
-    {"type": "WeaponCard", "name": "朱雀羽扇", "color": "方块", "point": 1, "dis": 4, "count": 1},
-    {"type": "WeaponCard", "name": "麒麟弓", "color": "红桃", "point": 5, "dis": 5, "count": 1},
-    
-    {"type": "WeaponCard", "name": "银月枪", "color": "方块", "point": 12, "dis": 3, "count": 1},
-    
-    {"type": "ArmourCard", "name": "八卦阵", "color": "黑桃", "point": 2, "count": 1},
-    {"type": "ArmourCard", "name": "八卦阵", "color": "梅花", "point": 2, "count": 1},
-    {"type": "ArmourCard", "name": "白银狮子", "color": "梅花", "point": 1, "count": 1},
-    {"type": "ArmourCard", "name": "仁王盾", "color": "梅花", "point": 2, "count": 1},
-    {"type": "ArmourCard", "name": "藤甲", "color": "黑桃", "point": 2, "count": 1},
-    {"type": "ArmourCard", "name": "藤甲", "color": "梅花", "point": 2, "count": 1},
-    
-    {"type": "AttackHorseCard", "name": "大宛", "color": "黑桃", "point": 13, "count": 1},
-    {"type": "AttackHorseCard", "name": "赤兔", "color": "红桃", "point": 5, "count": 1},
-    {"type": "AttackHorseCard", "name": "紫骍", "color": "黑桃", "point": 13, "count": 1},
-    
-    {"type": "DefenseHorseCard", "name": "绝影", "color": "黑桃", "point": 5, "count": 1},
-    {"type": "DefenseHorseCard", "name": "爪黄飞电", "color": "红桃", "point": 13, "count": 1},
-    {"type": "DefenseHorseCard", "name": "的卢", "color": "梅花", "point": 5, "count": 1},
-    {"type": "DefenseHorseCard", "name": "骅骝", "color": "方块", "point": 13, "count": 1},
-    
-    {"type": "TreasureCard", "name": "木牛流马", "color": "方块", "point": 5, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "决斗", "color": "黑桃", "point": 1, "count": 1},
-    {"type": "CommonJinnangCard", "name": "决斗", "color": "梅花", "point": 1, "count": 1},
-    {"type": "CommonJinnangCard", "name": "决斗", "color": "方块", "point": 1, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "无中生有", "color": "红桃", "point": 7, "count": 1},
-    {"type": "CommonJinnangCard", "name": "无中生有", "color": "红桃", "point": 8, "count": 1},
-    {"type": "CommonJinnangCard", "name": "无中生有", "color": "红桃", "point": 9, "count": 1},
-    {"type": "CommonJinnangCard", "name": "无中生有", "color": "红桃", "point": 11, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "过河拆桥", "color": "黑桃", "point": 3, "count": 1},
-    {"type": "CommonJinnangCard", "name": "过河拆桥", "color": "黑桃", "point": 4, "count": 1},
-    {"type": "CommonJinnangCard", "name": "过河拆桥", "color": "黑桃", "point": 12, "count": 1},
-    {"type": "CommonJinnangCard", "name": "过河拆桥", "color": "红桃", "point": 12, "count": 1},
-    {"type": "CommonJinnangCard", "name": "过河拆桥", "color": "梅花", "point": 3, "count": 1},
-    {"type": "CommonJinnangCard", "name": "过河拆桥", "color": "梅花", "point": 4, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "顺手牵羊", "color": "黑桃", "point": 3, "count": 1},
-    {"type": "CommonJinnangCard", "name": "顺手牵羊", "color": "黑桃", "point": 4, "count": 1},
-    {"type": "CommonJinnangCard", "name": "顺手牵羊", "color": "黑桃", "point": 11, "count": 1},
-    {"type": "CommonJinnangCard", "name": "顺手牵羊", "color": "方块", "point": 3, "count": 1},
-    {"type": "CommonJinnangCard", "name": "顺手牵羊", "color": "方块", "point": 4, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "借刀杀人", "color": "梅花", "point": 12, "count": 1},
-    {"type": "CommonJinnangCard", "name": "借刀杀人", "color": "梅花", "point": 13, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "南蛮入侵", "color": "黑桃", "point": 7, "count": 1},
-    {"type": "CommonJinnangCard", "name": "南蛮入侵", "color": "黑桃", "point": 12, "count": 1},
-    {"type": "CommonJinnangCard", "name": "南蛮入侵", "color": "梅花", "point": 7, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "万箭齐发", "color": "红桃", "point": 1, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "桃园结义", "color": "红桃", "point": 1, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "五谷丰登", "color": "红桃", "point": 3, "count": 1},
-    {"type": "CommonJinnangCard", "name": "五谷丰登", "color": "红桃", "point": 4, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "无懈可击", "color": "黑桃", "point": 11, "count": 1},
-    {"type": "CommonJinnangCard", "name": "无懈可击", "color": "黑桃", "point": 13, "count": 1},
-    {"type": "CommonJinnangCard", "name": "无懈可击", "color": "梅花", "point": 12, "count": 1},
-    {"type": "CommonJinnangCard", "name": "无懈可击", "color": "梅花", "point": 13, "count": 1},
-    {"type": "CommonJinnangCard", "name": "无懈可击", "color": "方块", "point": 12, "count": 1},
-    {"type": "CommonJinnangCard", "name": "无懈可击", "color": "红桃", "point": 1, "count": 1},
-    {"type": "CommonJinnangCard", "name": "无懈可击", "color": "红桃", "point": 12, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "火攻", "color": "红桃", "point": 2, "count": 1},
-    {"type": "CommonJinnangCard", "name": "火攻", "color": "红桃", "point": 3, "count": 1},
-    {"type": "CommonJinnangCard", "name": "火攻", "color": "方块", "point": 12, "count": 1},
-    
-    {"type": "CommonJinnangCard", "name": "铁索连环", "color": "黑桃", "point": 11, "count": 1},
-    {"type": "CommonJinnangCard", "name": "铁索连环", "color": "黑桃", "point": 12, "count": 1},
-    {"type": "CommonJinnangCard", "name": "铁索连环", "color": "梅花", "point": 10, "count": 1},
-    {"type": "CommonJinnangCard", "name": "铁索连环", "color": "梅花", "point": 11, "count": 1},
-    {"type": "CommonJinnangCard", "name": "铁索连环", "color": "梅花", "point": 12, "count": 1},
-    {"type": "CommonJinnangCard", "name": "铁索连环", "color": "梅花", "point": 13, "count": 1},
-    
-    {"type": "YanshiJinnangCard", "name": "乐不思蜀", "color": "黑桃", "point": 6, "count": 1},
-    {"type": "YanshiJinnangCard", "name": "乐不思蜀", "color": "红桃", "point": 6, "count": 1},
-    {"type": "YanshiJinnangCard", "name": "乐不思蜀", "color": "梅花", "point": 6, "count": 1},
-    
-    {"type": "YanshiJinnangCard", "name": "闪电", "color": "黑桃", "point": 1, "count": 1},
-    {"type": "YanshiJinnangCard", "name": "闪电", "color": "红桃", "point": 12, "count": 1},
-    
-    {"type": "YanshiJinnangCard", "name": "兵粮寸断", "color": "黑桃", "point": 10, "count": 1},
-    {"type": "YanshiJinnangCard", "name": "兵粮寸断", "color": "梅花", "point": 4, "count": 1}
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "黑桃",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "黑桃",
+      "point": 8,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "黑桃",
+      "point": 9,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "黑桃",
+      "point": 10,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "红桃",
+      "point": 10,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "红桃",
+      "point": 11,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 2,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 6,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 8,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 9,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 10,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "梅花",
+      "point": 11,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "方块",
+      "point": 6,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "方块",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "方块",
+      "point": 8,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "方块",
+      "point": 9,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "方块",
+      "point": 10,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "杀",
+      "color": "方块",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "FireSha",
+      "name": "火杀",
+      "color": "红桃",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "FireSha",
+      "name": "火杀",
+      "color": "红桃",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "FireSha",
+      "name": "火杀",
+      "color": "红桃",
+      "point": 10,
+      "count": 1
+    },
+    {
+      "type": "FireSha",
+      "name": "火杀",
+      "color": "方块",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "FireSha",
+      "name": "火杀",
+      "color": "方块",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "ThunderSha",
+      "name": "雷杀",
+      "color": "黑桃",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "ThunderSha",
+      "name": "雷杀",
+      "color": "黑桃",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "ThunderSha",
+      "name": "雷杀",
+      "color": "黑桃",
+      "point": 6,
+      "count": 1
+    },
+    {
+      "type": "ThunderSha",
+      "name": "雷杀",
+      "color": "黑桃",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "ThunderSha",
+      "name": "雷杀",
+      "color": "黑桃",
+      "point": 8,
+      "count": 1
+    },
+    {
+      "type": "ThunderSha",
+      "name": "雷杀",
+      "color": "梅花",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "ThunderSha",
+      "name": "雷杀",
+      "color": "梅花",
+      "point": 6,
+      "count": 1
+    },
+    {
+      "type": "ThunderSha",
+      "name": "雷杀",
+      "color": "梅花",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "ThunderSha",
+      "name": "雷杀",
+      "color": "梅花",
+      "point": 8,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "红桃",
+      "point": 2,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "红桃",
+      "point": 8,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "红桃",
+      "point": 9,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "红桃",
+      "point": 11,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "红桃",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "红桃",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 2,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 6,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 7,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 8,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 9,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 10,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "闪",
+      "color": "方块",
+      "point": 11,
+      "count": 3
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "红桃",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "红桃",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "红桃",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "红桃",
+      "point": 6,
+      "count": 2
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "红桃",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "红桃",
+      "point": 8,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "红桃",
+      "point": 9,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "红桃",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "方块",
+      "point": 2,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "方块",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "桃",
+      "color": "方块",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "酒",
+      "color": "黑桃",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "酒",
+      "color": "黑桃",
+      "point": 9,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "酒",
+      "color": "梅花",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "酒",
+      "color": "梅花",
+      "point": 9,
+      "count": 1
+    },
+    {
+      "type": "BasicCard",
+      "name": "酒",
+      "color": "方块",
+      "point": 9,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "诸葛连弩",
+      "color": "梅花",
+      "point": 1,
+      "dis": 1,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "诸葛连弩",
+      "color": "方块",
+      "point": 1,
+      "dis": 1,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "雌雄双股剑",
+      "color": "黑桃",
+      "point": 2,
+      "dis": 2,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "寒冰剑",
+      "color": "黑桃",
+      "point": 2,
+      "dis": 2,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "青釭剑",
+      "color": "黑桃",
+      "point": 2,
+      "dis": 2,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "古锭刀",
+      "color": "黑桃",
+      "point": 2,
+      "dis": 2,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "青龙偃月刀",
+      "color": "黑桃",
+      "point": 5,
+      "dis": 3,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "贯石斧",
+      "color": "方块",
+      "point": 5,
+      "dis": 3,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "丈八蛇矛",
+      "color": "黑桃",
+      "point": 12,
+      "dis": 3,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "方天画戟",
+      "color": "方块",
+      "point": 12,
+      "dis": 4,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "朱雀羽扇",
+      "color": "方块",
+      "point": 1,
+      "dis": 4,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "麒麟弓",
+      "color": "红桃",
+      "point": 5,
+      "dis": 5,
+      "count": 1
+    },
+    {
+      "type": "WeaponCard",
+      "name": "银月枪",
+      "color": "方块",
+      "point": 12,
+      "dis": 3,
+      "count": 1
+    },
+    {
+      "type": "ArmourCard",
+      "name": "八卦阵",
+      "color": "黑桃",
+      "point": 2,
+      "count": 1
+    },
+    {
+      "type": "ArmourCard",
+      "name": "八卦阵",
+      "color": "梅花",
+      "point": 2,
+      "count": 1
+    },
+    {
+      "type": "ArmourCard",
+      "name": "白银狮子",
+      "color": "梅花",
+      "point": 1,
+      "count": 1
+    },
+    {
+      "type": "ArmourCard",
+      "name": "仁王盾",
+      "color": "梅花",
+      "point": 2,
+      "count": 1
+    },
+    {
+      "type": "ArmourCard",
+      "name": "藤甲",
+      "color": "黑桃",
+      "point": 2,
+      "count": 1
+    },
+    {
+      "type": "ArmourCard",
+      "name": "藤甲",
+      "color": "梅花",
+      "point": 2,
+      "count": 1
+    },
+    {
+      "type": "AttackHorseCard",
+      "name": "大宛",
+      "color": "黑桃",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "AttackHorseCard",
+      "name": "赤兔",
+      "color": "红桃",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "AttackHorseCard",
+      "name": "紫骍",
+      "color": "黑桃",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "DefenseHorseCard",
+      "name": "绝影",
+      "color": "黑桃",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "DefenseHorseCard",
+      "name": "爪黄飞电",
+      "color": "红桃",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "DefenseHorseCard",
+      "name": "的卢",
+      "color": "梅花",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "DefenseHorseCard",
+      "name": "骅骝",
+      "color": "方块",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "TreasureCard",
+      "name": "木牛流马",
+      "color": "方块",
+      "point": 5,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "决斗",
+      "color": "黑桃",
+      "point": 1,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "决斗",
+      "color": "梅花",
+      "point": 1,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "决斗",
+      "color": "方块",
+      "point": 1,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无中生有",
+      "color": "红桃",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无中生有",
+      "color": "红桃",
+      "point": 8,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无中生有",
+      "color": "红桃",
+      "point": 9,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无中生有",
+      "color": "红桃",
+      "point": 11,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "过河拆桥",
+      "color": "黑桃",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "过河拆桥",
+      "color": "黑桃",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "过河拆桥",
+      "color": "黑桃",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "过河拆桥",
+      "color": "红桃",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "过河拆桥",
+      "color": "梅花",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "过河拆桥",
+      "color": "梅花",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "顺手牵羊",
+      "color": "黑桃",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "顺手牵羊",
+      "color": "黑桃",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "顺手牵羊",
+      "color": "黑桃",
+      "point": 11,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "顺手牵羊",
+      "color": "方块",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "顺手牵羊",
+      "color": "方块",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "借刀杀人",
+      "color": "梅花",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "借刀杀人",
+      "color": "梅花",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "南蛮入侵",
+      "color": "黑桃",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "南蛮入侵",
+      "color": "黑桃",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "南蛮入侵",
+      "color": "梅花",
+      "point": 7,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "万箭齐发",
+      "color": "红桃",
+      "point": 1,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "桃园结义",
+      "color": "红桃",
+      "point": 1,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "五谷丰登",
+      "color": "红桃",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "五谷丰登",
+      "color": "红桃",
+      "point": 4,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无懈可击",
+      "color": "黑桃",
+      "point": 11,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无懈可击",
+      "color": "黑桃",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无懈可击",
+      "color": "梅花",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无懈可击",
+      "color": "梅花",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无懈可击",
+      "color": "方块",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无懈可击",
+      "color": "红桃",
+      "point": 1,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "无懈可击",
+      "color": "红桃",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "火攻",
+      "color": "红桃",
+      "point": 2,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "火攻",
+      "color": "红桃",
+      "point": 3,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "火攻",
+      "color": "方块",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "铁索连环",
+      "color": "黑桃",
+      "point": 11,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "铁索连环",
+      "color": "黑桃",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "铁索连环",
+      "color": "梅花",
+      "point": 10,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "铁索连环",
+      "color": "梅花",
+      "point": 11,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "铁索连环",
+      "color": "梅花",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "CommonJinnangCard",
+      "name": "铁索连环",
+      "color": "梅花",
+      "point": 13,
+      "count": 1
+    },
+    {
+      "type": "YanshiJinnangCard",
+      "name": "乐不思蜀",
+      "color": "黑桃",
+      "point": 6,
+      "count": 1
+    },
+    {
+      "type": "YanshiJinnangCard",
+      "name": "乐不思蜀",
+      "color": "红桃",
+      "point": 6,
+      "count": 1
+    },
+    {
+      "type": "YanshiJinnangCard",
+      "name": "乐不思蜀",
+      "color": "梅花",
+      "point": 6,
+      "count": 1
+    },
+    {
+      "type": "YanshiJinnangCard",
+      "name": "闪电",
+      "color": "黑桃",
+      "point": 1,
+      "count": 1
+    },
+    {
+      "type": "YanshiJinnangCard",
+      "name": "闪电",
+      "color": "红桃",
+      "point": 12,
+      "count": 1
+    },
+    {
+      "type": "YanshiJinnangCard",
+      "name": "兵粮寸断",
+      "color": "黑桃",
+      "point": 10,
+      "count": 1
+    },
+    {
+      "type": "YanshiJinnangCard",
+      "name": "兵粮寸断",
+      "color": "梅花",
+      "point": 4,
+      "count": 1
+    }
   ]
 }

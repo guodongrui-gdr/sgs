@@ -1,13 +1,14 @@
+import json
+import logging
+import random
+from pathlib import Path
+from typing import List, Optional, TYPE_CHECKING
+
 from .event import Event, EventType
 from .event_bus import EventBus
-from .state import GameState, PlayerState, GamePhase
-from .response import ResponseSystem, CardResolver
 from .judge import JudgeSystem, DelayedTrickHandler
-import json
-from typing import List, Dict, Optional, Any, TYPE_CHECKING
-from pathlib import Path
-import random
-import logging
+from .response import ResponseSystem, CardResolver
+from .state import GameState, PlayerState, GamePhase
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +65,6 @@ class GameEngine:
         random.shuffle(self.deck)
 
     def setup_game(self, player_classes: List["Player"]):
-        from player.player import Player
-        from skills.registry import SkillRegistry
-
         self.players = player_classes
 
         random.shuffle(self.players)

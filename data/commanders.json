@@ -3,156 +3,218 @@
     "name": "曹操",
     "nation": "魏",
     "max_hp": 4,
-    "skills": ["奸雄", "护驾"],
+    "skills": [
+      "奸雄",
+      "护驾"
+    ],
     "is_lord": true
   },
   "WEI002": {
     "name": "司马懿",
     "nation": "魏",
     "max_hp": 3,
-    "skills": ["鬼才", "反馈"]
+    "skills": [
+      "鬼才",
+      "反馈"
+    ]
   },
   "WEI003": {
     "name": "夏侯惇",
     "nation": "魏",
     "max_hp": 4,
-    "skills": ["刚烈"]
+    "skills": [
+      "刚烈"
+    ]
   },
   "WEI004": {
     "name": "张辽",
     "nation": "魏",
     "max_hp": 4,
-    "skills": ["突袭"]
+    "skills": [
+      "突袭"
+    ]
   },
   "WEI005": {
     "name": "许褚",
     "nation": "魏",
     "max_hp": 4,
-    "skills": ["裸衣"]
+    "skills": [
+      "裸衣"
+    ]
   },
   "WEI006": {
     "name": "郭嘉",
     "nation": "魏",
     "max_hp": 3,
-    "skills": ["天妒", "遗计"]
+    "skills": [
+      "天妒",
+      "遗计"
+    ]
   },
   "WEI007": {
     "name": "甄姬",
     "nation": "魏",
     "max_hp": 3,
-    "skills": ["洛神", "倾国"]
+    "skills": [
+      "洛神",
+      "倾国"
+    ]
   },
-  
   "SHU001": {
     "name": "刘备",
     "nation": "蜀",
     "max_hp": 4,
-    "skills": ["仁德", "激将"],
+    "skills": [
+      "仁德",
+      "激将"
+    ],
     "is_lord": true
   },
   "SHU002": {
     "name": "关羽",
     "nation": "蜀",
     "max_hp": 4,
-    "skills": ["武圣"]
+    "skills": [
+      "武圣"
+    ]
   },
   "SHU003": {
     "name": "张飞",
     "nation": "蜀",
     "max_hp": 4,
-    "skills": ["咆哮"]
+    "skills": [
+      "咆哮"
+    ]
   },
   "SHU004": {
     "name": "诸葛亮",
     "nation": "蜀",
     "max_hp": 3,
-    "skills": ["观星", "空城"]
+    "skills": [
+      "观星",
+      "空城"
+    ]
   },
   "SHU005": {
     "name": "赵云",
     "nation": "蜀",
     "max_hp": 4,
-    "skills": ["龙胆"]
+    "skills": [
+      "龙胆"
+    ]
   },
   "SHU006": {
     "name": "马超",
     "nation": "蜀",
     "max_hp": 4,
-    "skills": ["马术", "铁骑"]
+    "skills": [
+      "马术",
+      "铁骑"
+    ]
   },
   "SHU007": {
     "name": "黄月英",
     "nation": "蜀",
     "max_hp": 3,
-    "skills": ["集智", "奇才"]
+    "skills": [
+      "集智",
+      "奇才"
+    ]
   },
-  
   "WU001": {
     "name": "孙权",
     "nation": "吴",
     "max_hp": 4,
-    "skills": ["制衡", "救援"],
+    "skills": [
+      "制衡",
+      "救援"
+    ],
     "is_lord": true
   },
   "WU002": {
     "name": "甘宁",
     "nation": "吴",
     "max_hp": 4,
-    "skills": ["奇袭"]
+    "skills": [
+      "奇袭"
+    ]
   },
   "WU003": {
     "name": "吕蒙",
     "nation": "吴",
     "max_hp": 4,
-    "skills": ["克己"]
+    "skills": [
+      "克己"
+    ]
   },
   "WU004": {
     "name": "黄盖",
     "nation": "吴",
     "max_hp": 4,
-    "skills": ["苦肉"]
+    "skills": [
+      "苦肉"
+    ]
   },
   "WU005": {
     "name": "周瑜",
     "nation": "吴",
     "max_hp": 3,
-    "skills": ["英姿", "反间"]
+    "skills": [
+      "英姿",
+      "反间"
+    ]
   },
   "WU006": {
     "name": "大乔",
     "nation": "吴",
     "max_hp": 3,
-    "skills": ["国色", "流离"]
+    "skills": [
+      "国色",
+      "流离"
+    ]
   },
   "WU007": {
     "name": "陆逊",
     "nation": "吴",
     "max_hp": 3,
-    "skills": ["谦逊", "连营"]
+    "skills": [
+      "谦逊",
+      "连营"
+    ]
   },
   "WU008": {
     "name": "孙尚香",
     "nation": "吴",
     "max_hp": 3,
-    "skills": ["结姻", "枭姬"]
+    "skills": [
+      "结姻",
+      "枭姬"
+    ]
   },
-  
   "QUN001": {
     "name": "华佗",
     "nation": "群",
     "max_hp": 3,
-    "skills": ["急救", "青囊"]
+    "skills": [
+      "急救",
+      "青囊"
+    ]
   },
   "QUN002": {
     "name": "吕布",
     "nation": "群",
     "max_hp": 4,
-    "skills": ["无双"]
+    "skills": [
+      "无双"
+    ]
   },
   "QUN003": {
     "name": "貂蝉",
     "nation": "群",
     "max_hp": 3,
-    "skills": ["离间", "闭月"]
+    "skills": [
+      "离间",
+      "闭月"
+    ]
   }
 }

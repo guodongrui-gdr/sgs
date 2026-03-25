@@ -1,19 +1,13 @@
-import random
-import json
 import argparse
+import json
+import random
 from pathlib import Path
 
-from config import MIN_PLAYERS, MAX_PLAYERS, IDENTITY_CONFIG
-from engine import GameEngine, EventType
+from ai.rl_ai import RLAI, create_rl_ai
+from config import MIN_PLAYERS, MAX_PLAYERS
+from engine import GameEngine
 from player import Player
 from skills.registry import SkillRegistry
-import skills.wei
-import skills.shu
-import skills.wu
-import skills.qun
-
-from ai.rl_ai import RLAI, create_rl_ai
-from ai.rule_ai import RuleAI, RuleAIConfig
 
 
 def load_commanders():
@@ -787,6 +781,11 @@ def game_loop(engine: GameEngine, rl_ai: RLAI = None):
 def main():
     parser = argparse.ArgumentParser(description="三国杀 - 人机对战版")
     parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="启动图形界面模式",
+    )
+    parser.add_argument(
         "--ai-type",
         type=str,
         default="random",
@@ -802,6 +801,13 @@ def main():
     parser.add_argument("--player-num", type=int, default=5, help="玩家数量 (默认: 5)")
 
     args = parser.parse_args()
+
+    if args.gui:
+        from gui.main_window import GameWindow
+
+        game_window = GameWindow()
+        game_window.run()
+        return
 
     print("=" * 50)
     print("三国杀 - 人机对战版")

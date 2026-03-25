@@ -11,10 +11,12 @@
 ##### 1. 白银狮子伤害计算错误 ✅ 已修复
 
 **问题描述**：
+
 - 规则：受到**大于1点**伤害时，将伤害值**改为1点**
 - 代码：`actual_damage = max(1, actual_damage - 1)` (错误：减1而非改为1)
 
 **修复方案**：
+
 ```python
 # engine/response.py:279-285
 if (
@@ -28,10 +30,12 @@ if (
 ##### 2. 白银狮子失去回血效果缺失 ✅ 已修复
 
 **问题描述**：
+
 - 规则：每当失去装备区里的【白银狮子】后，回复1点体力
 - 代码：未实现此效果
 
 **修复方案**：
+
 ```python
 # engine/game_engine.py:520-529
 def _equip_armour(self, player: "Player", card: "Card"):
@@ -49,9 +53,11 @@ def _equip_armour(self, player: "Player", card: "Card"):
 ##### 3. 判定返回值类型错误 ✅ 已修复
 
 **问题描述**：
+
 - `JudgeCard.check()` 方法返回 bool，但声明返回 JudgeResult
 
 **修复方案**：
+
 ```python
 # engine/judge.py:22-28
 def check(self, card: "Card") -> JudgeResult:
@@ -66,10 +72,12 @@ def check(self, card: "Card") -> JudgeResult:
 ##### 4. 藤甲对雷电伤害错误+1 ✅ 已修复
 
 **问题描述**：
+
 - 规则：受到**火焰伤害**时伤害+1
 - 代码：`is_elemental` 包括火焰和雷电，导致雷电伤害也+1
 
 **修复方案**：
+
 ```python
 # engine/response.py:271-278
 is_fire = getattr(card, "is_fire", False) if card else False
@@ -84,9 +92,11 @@ if (
 ##### 5. 铁索连环传递伤害丢失属性 ✅ 已修复
 
 **问题描述**：
+
 - 铁索传递属性伤害时，`is_elemental=False`，导致藤甲+1效果不触发
 
 **修复方案**：
+
 ```python
 # engine/game_engine.py:552-649
 def deal_damage(
@@ -111,10 +121,12 @@ def _propagate_chain_damage(..., is_fire: bool = False, is_thunder: bool = False
 ##### 6. 距离计算未取双向最小值 ✅ 已修复
 
 **问题描述**：
+
 - 规则：距离 = min(顺时针距离, 逆时针距离)
 - 部分代码只计算单向距离
 
 **修复方案**：
+
 ```python
 # engine/response.py:522-545
 def _calculate_distance(self, source: "Player", target: "Player") -> int:
@@ -140,10 +152,12 @@ def _calculate_distance(self, source: "Player", target: "Player") -> int:
 ##### 7. 缺少银月枪卡牌 ✅ 已修复
 
 **问题描述**：
+
 - 规则中有【银月枪】（方块Q，攻击范围3）
 - 代码未实现
 
 **修复方案**：
+
 - 添加到 `card.py` 和 `data/cards.json`
 
 ##### 8. 武器技能未实现 ✅ 已修复
@@ -168,12 +182,14 @@ def _calculate_distance(self, source: "Player", target: "Player") -> int:
 ##### 10. 回合阶段不完整 ✅ 已修复
 
 **修复方案**：
+
 - 添加 `PREPARE_PHASE`（准备阶段）事件
 - 添加 `END_PHASE`（结束阶段）事件
 - 更新 `GamePhase` 枚举
 - 添加 `end_turn()` 方法
 
 **修改的文件**：
+
 - `engine/event.py` - EventType 枚举
 - `engine/state.py` - GamePhase 枚举
 - `engine/game_engine.py` - next_turn 和 end_turn 方法
@@ -183,6 +199,7 @@ def _calculate_distance(self, source: "Player", target: "Player") -> int:
 ### 过河拆桥/顺手牵羊目标选择问题 ✅ 已修复 (2026-03-23)
 
 **问题描述**：
+
 - 玩家使用过河拆桥或顺手牵羊时，没有显示选择对手牌/装备的提示
 - AI使用这些牌时也缺乏对坐骑和宝物的处理
 
@@ -191,10 +208,12 @@ def _calculate_distance(self, source: "Player", target: "Player") -> int:
 但应该检查 `source.is_human`（使用卡牌的是否是人类玩家）。
 
 **修复方案**：
+
 1. 将 `target.is_human` 改为 `source.is_human`
 2. 添加对进攻坐骑、防御坐骑、宝物的处理
 
 **修改的文件**：
+
 - `engine/game_engine.py` - `_resolve_chaiqiao` 和 `_resolve_shunshou` 方法
 
 ---
@@ -202,6 +221,7 @@ def _calculate_distance(self, source: "Player", target: "Player") -> int:
 ### TURN_START 事件触发问题 ✅ 已修复 (2026-03-23)
 
 **问题描述**：
+
 - 第一个玩家的回合开始时，`TURN_START` 事件没有被触发
 - 观星、咆哮、洛神等技能不生效
 
@@ -209,10 +229,12 @@ def _calculate_distance(self, source: "Player", target: "Player") -> int:
 `engine.setup_game()` 中将 `phase` 设置为 `TURN_START`，但 `game_loop` 中的检查会导致跳过事件触发。
 
 **修复方案**：
+
 1. 移除 `setup_game()` 中设置 `phase = TURN_START` 的代码
 2. 在 `game_loop()` 中添加正确的事件触发逻辑
 
 **修改的文件**：
+
 - `engine/game_engine.py` - `setup_game` 方法
 - `new_main.py` - `game_loop` 函数
 
@@ -221,6 +243,7 @@ def _calculate_distance(self, source: "Player", target: "Player") -> int:
 ### 装备系统无法生效 ✅ 已修复 (2026-03-23)
 
 **问题描述**：
+
 - 使用装备牌后，装备没有实际装备到玩家的装备槽位
 - 武器、防具、坐骑都无法生效
 - 诸葛连弩的无限杀效果不生效
@@ -259,6 +282,7 @@ elif card.card_type == "TreasureCard":
 ```
 
 **测试验证**：
+
 - ✅ 武器装备正确，攻击范围正确更新
 - ✅ 诸葛连弩无限杀效果生效
 - ✅ 仁王盾抵挡黑杀
@@ -267,6 +291,7 @@ elif card.card_type == "TreasureCard":
 - ✅ 进攻马/防御马距离计算正确
 
 **修改的文件**：
+
 - `engine/game_engine.py` - `_resolve_card` 方法
 
 ---
@@ -278,12 +303,14 @@ elif card.card_type == "TreasureCard":
 ### 卡牌类型系统重构 ✅ 完成
 
 **问题**：
+
 - 之前使用字符串匹配判断杀（`"杀" in card.name`）
 - 火杀、雷杀需要特殊判断
 - 代码可维护性差
 
 **解决方案**：
 创建清晰的卡牌继承体系：
+
 ```
 Card
 └── BasicCard
@@ -293,18 +320,20 @@ Card
 ```
 
 **修改的文件**：
+
 1. `card/base.py` - 创建 ShaCard 基类
-   - 添加 `is_sha()` 方法
-   - 添加 `is_elemental` 属性
-   - FireSha 和 ThunderSha 继承自 ShaCard
+    - 添加 `is_sha()` 方法
+    - 添加 `is_elemental` 属性
+    - FireSha 和 ThunderSha 继承自 ShaCard
 
 2. `card/factory.py` - 智能卡牌类型选择
-   - 根据卡牌名称自动选择正确类型
-   - 普通杀自动使用 ShaCard 类型
+    - 根据卡牌名称自动选择正确类型
+    - 普通杀自动使用 ShaCard 类型
 
 3. 添加辅助函数 `is_sha_card(card)` - 类型安全的判断
 
 **测试结果**：
+
 ```python
 isinstance(ShaCard(), ShaCard)      # True
 isinstance(FireSha(), ShaCard)      # True  
@@ -316,11 +345,13 @@ isinstance(ThunderSha(), ShaCard)   # True
 ### 1. 无双技能未生效 ✅ 已修复
 
 **问题描述**：
+
 - 吕布使用火杀或雷杀时，无双技能未触发
 - 目标只需要出一张闪
 
 **根本原因**：
 无双技能判断使用字符串匹配：
+
 ```python
 # 修复前 - 错误
 return event.card.name in ["杀", "决斗"]  # 不匹配"雷杀"、"火杀"
@@ -328,6 +359,7 @@ return event.card.name in ["杀", "决斗"]  # 不匹配"雷杀"、"火杀"
 
 **修复方案**：
 使用类型判断替代字符串匹配：
+
 ```python
 # 修复后 - 正确
 from card.base import is_sha_card
@@ -335,6 +367,7 @@ return is_sha_card(event.card) or event.card.name == "决斗"
 ```
 
 **修改的文件**：
+
 - `skills/qun.py` - Wushuang 类
 - `engine/game_engine.py` - use_card 和 _resolve_card 方法
 - `engine/response.py` - resolve_sha 方法
@@ -346,6 +379,7 @@ return is_sha_card(event.card) or event.card.name == "决斗"
 ### 3. 卡牌使用提示信息 ✅ 已修复
 
 启用了所有被注释的提示信息：
+
 - 五谷丰登：显示翻开的卡牌
 - 桃园结义：显示恢复体力的玩家
 - 借刀杀人：显示可选目标
@@ -354,6 +388,7 @@ return is_sha_card(event.card) or event.card.name == "决斗"
 ### 4. 响应系统提示信息 ✅ 已修复
 
 玩家响应时显示：
+
 - 可用卡牌列表
 - 跳过选项
 - 当前需要出多少张闪
@@ -369,6 +404,7 @@ return is_sha_card(event.card) or event.card.name == "决斗"
 **是的，训练时也会有同样的问题！**
 
 修复同时影响：
+
 1. ✅ 主程序游戏 (`new_main.py`)
 2. ✅ 训练环境 (`SGSEnv`)
 3. ✅ RL AI 决策
@@ -377,6 +413,7 @@ return is_sha_card(event.card) or event.card.name == "决斗"
 ### 建议
 
 由于无双技能之前没有正确生效，建议：
+
 1. 重新训练模型以学习正确的无双机制
 2. 或在现有模型基础上继续训练微调
 
@@ -385,6 +422,7 @@ return is_sha_card(event.card) or event.card.name == "决斗"
 ### 使用类型判断替代字符串匹配
 
 **修复前**：
+
 ```python
 if "杀" in card.name:
     # 处理杀
@@ -393,6 +431,7 @@ if "火" in card.name or "雷" in card.name:
 ```
 
 **修复后**：
+
 ```python
 from card.base import is_sha_card
 
