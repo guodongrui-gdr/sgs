@@ -99,6 +99,7 @@ from train.visualize import (
     log_win_rate,
     log_elo,
     log_hyperparameters,
+    log_episode_metrics,
 )
 
 
@@ -243,17 +244,58 @@ class TensorBoardLoggingCallback(BaseCallback):
         self.log_freq = log_freq
 
     def _on_step(self) -> bool:
-        # Log metrics at specified frequency
-        if self.n_calls % self.log_freq == 0:
-            # Update step in logger
-            self.metrics_logger.set_step(self.num_timesteps)
-
-            # Get training info from model
-            if hasattr(self.model, "_stats_window_size"):
-                # Access recent statistics if available
-                pass
-
+        # Minimal stub - logging happens in _on_rollout_end when metrics are fresh
         return True
+
+    def _on_rollout_end(self) -> None:
+        """
+        Log metrics after each rollout completes.
+        SB3 logger.dump() populates name_to_value AFTER rollout ends.
+        """
+        # Update step in logger
+        self.metrics_logger.set_step(self.num_timesteps)
+
+        # Get training info from model logger
+        if (
+            hasattr(self.model, "logger")
+            and self.model.logger is not None
+            and hasattr(self.model.logger, "name_to_value")
+        ):
+            values = self.model.logger.name_to_value
+
+            # Map SB3 logger keys to our log_training_metrics parameters
+            loss = values.get("train/loss")
+            entropy = values.get("train/entropy_loss")
+            learning_rate = values.get("train/learning_rate")
+            value_loss = values.get("train/value_loss")
+            policy_loss = values.get("train/policy_gradient_loss")
+            approx_kl = values.get("train/approx_kl")
+            clip_fraction = values.get("train/clip_fraction")
+            explained_variance = values.get("train/explained_variance")
+
+            # Log training metrics
+            self.metrics_logger.log_training_metrics(
+                loss=loss,
+                entropy=entropy,
+                learning_rate=learning_rate,
+                value_loss=value_loss,
+                policy_loss=policy_loss,
+                approx_kl=approx_kl,
+                clip_fraction=clip_fraction,
+                explained_variance=explained_variance,
+            )
+
+            # Log episode metrics when available
+            if "rollout/ep_rew_mean" in values:
+                ep_rew_mean = values.get("rollout/ep_rew_mean")
+                ep_len_mean = values.get("rollout/ep_len_mean")
+                if ep_rew_mean is not None and ep_len_mean is not None:
+                    log_episode_metrics(
+                        self.metrics_logger.writer,
+                        self.num_timesteps,
+                        ep_rew_mean,
+                        int(ep_len_mean),
+                    )
 
 
 # ============================================================================
