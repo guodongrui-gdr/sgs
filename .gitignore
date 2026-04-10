@@ -13,5 +13,6 @@ build/
 htmlcov/
 train/logs/
 *.log
+train/results.tsv
 .env
 .env.local

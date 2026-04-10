@@ -1,0 +1,378 @@
+{
+  "current_version": 56,
+  "policies": [
+    {
+      "path": "/tmp/tmpmvh9g9ip/test_model.zip",
+      "version": 36,
+      "timestamp": "2026-04-10T15:51:56.686645",
+      "elo_rating": 1299.9998019450002,
+      "base_elo": 1300.0,
+      "games_played": 0,
+      "wins": 0,
+      "losses": 0,
+      "win_rate": 0.0,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 0,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 0,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.686646",
+      "elo_decay_factor": 0.99999984765,
+      "metadata": {}
+    },
+    {
+      "path": "/tmp/tmpmvh9g9ip/test_model.zip",
+      "version": 37,
+      "timestamp": "2026-04-10T15:51:56.686816",
+      "elo_rating": 1399.9997873477778,
+      "base_elo": 1400.0,
+      "games_played": 0,
+      "wins": 0,
+      "losses": 0,
+      "win_rate": 0.0,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 0,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 0,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.686817",
+      "elo_decay_factor": 0.9999998481055555,
+      "metadata": {}
+    },
+    {
+      "path": "/tmp/tmpmvh9g9ip/test_model.zip",
+      "version": 38,
+      "timestamp": "2026-04-10T15:51:56.686994",
+      "elo_rating": 1499.9997728958333,
+      "base_elo": 1500.0,
+      "games_played": 0,
+      "wins": 0,
+      "losses": 0,
+      "win_rate": 0.0,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 0,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 0,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.686996",
+      "elo_decay_factor": 0.9999998485972222,
+      "metadata": {}
+    },
+    {
+      "path": "/tmp/tmpmvh9g9ip/test_model.zip",
+      "version": 39,
+      "timestamp": "2026-04-10T15:51:56.687214",
+      "elo_rating": 1599.9997587288888,
+      "base_elo": 1600.0,
+      "games_played": 0,
+      "wins": 0,
+      "losses": 0,
+      "win_rate": 0.0,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 0,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 0,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.687215",
+      "elo_decay_factor": 0.9999998492055555,
+      "metadata": {}
+    },
+    {
+      "path": "/tmp/tmpmvh9g9ip/test_model.zip",
+      "version": 40,
+      "timestamp": "2026-04-10T15:51:56.687426",
+      "elo_rating": 1699.9997446505556,
+      "base_elo": 1700.0,
+      "games_played": 0,
+      "wins": 0,
+      "losses": 0,
+      "win_rate": 0.0,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 0,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 0,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.687427",
+      "elo_decay_factor": 0.9999998497944445,
+      "metadata": {}
+    },
+    {
+      "path": "/tmp/tmpmvh9g9ip/test_model.zip",
+      "version": 41,
+      "timestamp": "2026-04-10T15:51:56.687640",
+      "elo_rating": 1799.9997306950002,
+      "base_elo": 1800.0,
+      "games_played": 0,
+      "wins": 0,
+      "losses": 0,
+      "win_rate": 0.0,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 0,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 0,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.687641",
+      "elo_decay_factor": 0.9999998503861112,
+      "metadata": {}
+    },
+    {
+      "path": "/tmp/tmpmvh9g9ip/test_model.zip",
+      "version": 42,
+      "timestamp": "2026-04-10T15:51:56.687856",
+      "elo_rating": 1899.9997168683333,
+      "base_elo": 1900.0,
+      "games_played": 0,
+      "wins": 0,
+      "losses": 0,
+      "win_rate": 0.0,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 0,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 0,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.687857",
+      "elo_decay_factor": 0.9999998509833333,
+      "metadata": {}
+    },
+    {
+      "path": "/tmp/tmpbbvnhfk2/test_model.zip",
+      "version": 52,
+      "timestamp": "2026-04-10T15:51:56.698601",
+      "elo_rating": 1199.9998569966667,
+      "base_elo": 1200.0,
+      "games_played": 0,
+      "wins": 0,
+      "losses": 0,
+      "win_rate": 0.0,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 0,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 0,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.698602",
+      "elo_decay_factor": 0.9999998808305556,
+      "metadata": {}
+    },
+    {
+      "path": "/tmp/tmpd729uzgo/test_model.zip",
+      "version": 55,
+      "timestamp": "2026-04-10T15:51:56.741507",
+      "elo_rating": 994.8135236179721,
+      "base_elo": 1040.5681569590686,
+      "games_played": 10,
+      "wins": 5,
+      "losses": 5,
+      "win_rate": 0.5,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 5,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 0,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.745976",
+      "elo_decay_factor": 1.0,
+      "metadata": {}
+    },
+    {
+      "path": "/tmp/tmpd729uzgo/test_model.zip",
+      "version": 56,
+      "timestamp": "2026-04-10T15:51:56.741801",
+      "elo_rating": 1005.1864763820279,
+      "base_elo": 1043.161395150083,
+      "games_played": 10,
+      "wins": 5,
+      "losses": 5,
+      "win_rate": 0.5,
+      "parent_version": -1,
+      "identity_stats": {
+        "\u4e3b\u516c_wins": 0,
+        "\u4e3b\u516c_losses": 0,
+        "\u5fe0\u81e3_wins": 0,
+        "\u5fe0\u81e3_losses": 0,
+        "\u53cd\u8d3c_wins": 5,
+        "\u53cd\u8d3c_losses": 0,
+        "\u5185\u5978_wins": 0,
+        "\u5185\u5978_losses": 0
+      },
+      "last_match_time": "2026-04-10T15:51:56.745975",
+      "elo_decay_factor": 1.0,
+      "metadata": {}
+    }
+  ],
+  "total_matches": 14,
+  "elo_history": [
+    {
+      "match_id": 1,
+      "winner_version": 11,
+      "loser_version": 12,
+      "winner_elo_change": 16.0,
+      "loser_elo_change": -16.0,
+      "timestamp": "2026-04-10T15:51:56.661435"
+    },
+    {
+      "match_id": 2,
+      "winner_version": 13,
+      "loser_version": 14,
+      "winner_elo_change": 16.0,
+      "loser_elo_change": -16.0,
+      "timestamp": "2026-04-10T15:51:56.662628"
+    },
+    {
+      "match_id": 3,
+      "winner_version": 15,
+      "loser_version": 16,
+      "winner_elo_change": 29.09090909090909,
+      "loser_elo_change": -29.09090909090909,
+      "timestamp": "2026-04-10T15:51:56.663887"
+    },
+    {
+      "match_id": 4,
+      "winner_version": 54,
+      "loser_version": 53,
+      "winner_elo_change": 16.0,
+      "loser_elo_change": -16.0,
+      "timestamp": "2026-04-10T15:51:56.700029"
+    },
+    {
+      "match_id": 5,
+      "winner_version": 55,
+      "loser_version": 56,
+      "winner_elo_change": 16.0,
+      "loser_elo_change": -16.0,
+      "timestamp": "2026-04-10T15:51:56.742402"
+    },
+    {
+      "match_id": 6,
+      "winner_version": 56,
+      "loser_version": 55,
+      "winner_elo_change": 17.469501528975478,
+      "loser_elo_change": -17.469501528975478,
+      "timestamp": "2026-04-10T15:51:56.742791"
+    },
+    {
+      "match_id": 7,
+      "winner_version": 55,
+      "loser_version": 56,
+      "winner_elo_change": 16.135342864367114,
+      "loser_elo_change": -16.135342864367114,
+      "timestamp": "2026-04-10T15:51:56.743170"
+    },
+    {
+      "match_id": 8,
+      "winner_version": 56,
+      "loser_version": 55,
+      "winner_elo_change": 17.34757390207256,
+      "loser_elo_change": -17.34757390207256,
+      "timestamp": "2026-04-10T15:51:56.743543"
+    },
+    {
+      "match_id": 9,
+      "winner_version": 55,
+      "loser_version": 56,
+      "winner_elo_change": 16.246977078530552,
+      "loser_elo_change": -16.246977078530552,
+      "timestamp": "2026-04-10T15:51:56.743917"
+    },
+    {
+      "match_id": 10,
+      "winner_version": 56,
+      "loser_version": 55,
+      "winner_elo_change": 17.246871867824446,
+      "loser_elo_change": -17.246871867824446,
+      "timestamp": "2026-04-10T15:51:56.744292"
+    },
+    {
+      "match_id": 11,
+      "winner_version": 55,
+      "loser_version": 56,
+      "winner_elo_change": 16.33903965238751,
+      "loser_elo_change": -16.33903965238751,
+      "timestamp": "2026-04-10T15:51:56.744687"
+    },
+    {
+      "match_id": 12,
+      "winner_version": 56,
+      "loser_version": 55,
+      "winner_elo_change": 17.163732119755288,
+      "loser_elo_change": -17.163732119755288,
+      "timestamp": "2026-04-10T15:51:56.745087"
+    },
+    {
+      "match_id": 13,
+      "winner_version": 55,
+      "loser_version": 56,
+      "winner_elo_change": 16.41495432285242,
+      "loser_elo_change": -16.41495432285242,
+      "timestamp": "2026-04-10T15:51:56.745555"
+    },
+    {
+      "match_id": 14,
+      "winner_version": 56,
+      "loser_version": 55,
+      "winner_elo_change": 17.095110881537757,
+      "loser_elo_change": -17.095110881537757,
+      "timestamp": "2026-04-10T15:51:56.745977"
+    }
+  ],
+  "config": {
+    "max_size": 10,
+    "elo_decay_rate": 0.01,
+    "elo_max_decay": 0.3,
+    "sample_latest_ratio": 0.3,
+    "sample_best_ratio": 0.3,
+    "sample_random_ratio": 0.4
+  }
+}

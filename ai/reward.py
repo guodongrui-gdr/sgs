@@ -875,6 +875,84 @@ class RewardSystem:
         """验证当前配置"""
         return self.config.validate_config()
 
+    def skill_decision_quality_reward(
+        self,
+        decision_type: str,
+        skill_name: str,
+        decision_quality: float = 0.5,
+        context: Optional[Dict] = None,
+    ) -> float:
+        """
+        技能决策质量奖励
+
+        Args:
+            decision_type: 决策类型 ("YES_NO", "SELECT_ORDER", "SELECT_CARDS", etc.)
+            skill_name: 技能名称
+            decision_quality: 决策质量评分 (0.0 - 1.0)
+            context: 额外上下文信息
+
+        Returns:
+            奖励值
+        """
+        context = context or {}
+        base_reward = 0.0
+
+        if decision_type == "YES_NO":
+            # YES_NO决策: 发动有价值的技能+0.5，拒绝有价值的技能-0.5
+            activated = context.get("activated", True)
+            is_valuable = context.get("is_valuable", True)
+
+            if activated and is_valuable:
+                base_reward = 0.5  # 发动有价值的技能
+            elif not activated and is_valuable:
+                base_reward = -0.5  # 拒绝有价值的技能
+            elif activated and not is_valuable:
+                base_reward = 0.1  # 发动价值不高的技能，小奖励
+            else:
+                base_reward = 0.0  # 正确拒绝价值不高的技能
+
+        elif decision_type == "SELECT_ORDER":
+            # SELECT_ORDER (观星): 根据牌序质量给予奖励 (0.5 - 2.0)
+            # decision_quality 应该在 0.0 - 1.0 之间
+            quality = np.clip(decision_quality, 0.0, 1.0)
+            # 映射到 0.5 - 2.0 范围
+            base_reward = 0.5 + (quality * 1.5)
+
+        elif decision_type == "DISTRIBUTE":
+            # 遗计分配: 给队友+0.5，给敌人-0.5
+            ally_target = context.get("ally_target", True)
+            if ally_target:
+                base_reward = 0.5
+            else:
+                base_reward = -0.5
+
+        elif decision_type in ("SELECT_CARDS", "SELECT_TARGETS", "SELECT_PAIR"):
+            # 其他选择类决策: 基于质量给予基础奖励
+            quality = np.clip(decision_quality, 0.0, 1.0)
+            base_reward = quality * 0.5
+
+        else:
+            # 默认: 小奖励
+            base_reward = 0.1
+
+        # 归一化
+        final_reward = np.clip(
+            base_reward, -self.config.clip_reward, self.config.clip_reward
+        )
+
+        # 记录
+        self.calculator.records.append(
+            RewardRecord(
+                event_type=f"skill_decision_{decision_type.lower()}",
+                base_reward=base_reward,
+                shaped_reward=base_reward,
+                final_reward=final_reward,
+                context={"skill_name": skill_name, **context},
+            )
+        )
+
+        return final_reward
+
 
 # 预定义的奖励事件
 class RewardEvent:

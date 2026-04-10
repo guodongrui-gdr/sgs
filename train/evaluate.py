@@ -1,482 +1,464 @@
 """
-模型评估脚本 - 验证训练效果
+模型评估模块 - 支持RL模型与对手池对战评估
 
 功能:
-- 加载训练好的模型
-- 与随机/规则策略对战
-- 统计胜率和奖励
-- 各身份详细统计
-- 可视化对局
+- 运行N场游戏与对手池对战
+- 追踪身份胜率（主公、忠臣、反贼、内奸）
+- 计算整体胜率和ELO评分
+- 生成JSON格式评估报告
 """
 
-import argparse
 import json
-import sys
-from datetime import datetime
+import logging
+import random
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Any
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from train.statistics import (
+    WinRateStats,
+    IdentityTracker,
+    wilson_score_interval,
+    compare_to_baseline,
+    get_baseline_win_rate,
+)
+from ai.rl_ai import RLAI, RLAIConfig
+from ai.rule_ai import RuleAI, RuleAIConfig
+from engine.game_engine import GameEngine
+from player.player import Player
 
-from ai.gym_wrapper import SGSEnv, SGSConfig
-from ai.reward import IdentityRelationship
+logger = logging.getLogger(__name__)
 
 
-def _get_action_masks_from_obs(obs):
-	"""从观察中提取动作掩码"""
-	if isinstance(obs, dict):
-		type_mask = obs.get("action_mask_type", np.ones(12))
-		card_mask = obs.get("action_mask_card", np.ones(20))
-		target_mask = obs.get("action_mask_target", np.ones(8))
-		return np.concatenate([type_mask, card_mask, target_mask])
-	return np.ones(40)
+@dataclass
+class EvaluationConfig:
+    """评估配置"""
+
+    num_games: int = 100  # 评估游戏数量
+    player_num: int = 5  # 每局玩家数量
+    max_rounds: int = 100  # 每局最大回合数
+    use_masking: bool = True  # 是否使用动作掩码
+    deterministic: bool = True  # 是否确定性策略
+    verbose: bool = False  # 是否输出详细日志
+    seed: Optional[int] = None  # 随机种子
+    opponent_types: List[str] = field(default_factory=lambda: ["rule", "random"])
+    # 对手类型: "rule"=规则AI, "random"=随机AI, "pool"=从池采样
+
+
+@dataclass
+class EvaluationResult:
+    """评估结果"""
+
+    model_path: str
+    total_games: int
+    wins: int
+    win_rate: float
+    identity_win_rates: Dict[str, float]
+    elo_rating: float
+    confidence_interval: Tuple[float, float]
+    comparison_to_baseline: Dict
+    game_details: List[Dict]
+    metadata: Dict
+
+    def to_dict(self) -> Dict:
+        """转换为字典（用于JSON序列化）"""
+        return {
+            "model_path": self.model_path,
+            "total_games": self.total_games,
+            "wins": self.wins,
+            "win_rate": self.win_rate,
+            "identity_win_rates": self.identity_win_rates,
+            "elo_rating": self.elo_rating,
+            "confidence_interval": {
+                "low": self.confidence_interval[0],
+                "high": self.confidence_interval[1],
+            },
+            "comparison_to_baseline": self.comparison_to_baseline,
+            "game_details": self.game_details,
+            "metadata": self.metadata,
+        }
+
+    def to_json(self, indent: int = 2) -> str:
+        """转换为JSON字符串"""
+        return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+
+    def save(self, path: str) -> None:
+        """保存到文件"""
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(self.to_json())
 
 
 def evaluate_model(
-		model_path: str,
-		n_episodes: int = 100,
-		player_num: int = 5,
-		max_rounds: int = 100,
-		render: bool = False,
-		verbose: bool = True,
-		save_results: bool = False,
-		other_player_policy: str = "rule",
-):
-	"""评估模型（控制单个玩家）"""
-
-	try:
-		from sb3_contrib import MaskablePPO
-
-		use_masking = True
-	except ImportError:
-		from stable_baselines3 import PPO as MaskablePPO
-
-		use_masking = False
-
-	config = SGSConfig(
-		player_num=player_num,
-		max_rounds=max_rounds,
-		other_player_policy=other_player_policy,
-	)
-
-	env = SGSEnv(config)
-
-	model = MaskablePPO.load(model_path, env=env)
-
-	results = {
-		"model_path": model_path,
-		"timestamp": datetime.now().isoformat(),
-		"total_episodes": n_episodes,
-		"wins": 0,
-		"losses": 0,
-		"draws": 0,
-		"total_reward": 0.0,
-		"identity_wins": {
-			"主公": 0,
-			"忠臣": 0,
-			"反贼": 0,
-			"内奸": 0,
-		},
-		"identity_games": {
-			"主公": 0,
-			"忠臣": 0,
-			"反贼": 0,
-			"内奸": 0,
-		},
-		"game_lengths": [],
-		"episode_rewards": [],
-		"win_by_round": {},
-		"damage_dealt": [],
-		"damage_taken": [],
-	}
-
-	print(f"\n{'=' * 60}")
-	print(f"评估模型: {model_path}")
-	print(f"对局数: {n_episodes}")
-	print(f"{'=' * 60}\n")
-
-	for episode in range(n_episodes):
-		obs, _ = env.reset(seed=episode)
-		done = False
-		step_count = 0
-		episode_reward = 0.0
-
-		while not done:
-			if use_masking:
-				if hasattr(env, "action_masks"):
-					action_masks = env.action_masks()
-				elif hasattr(env, "get_attr"):
-					action_masks = env.get_attr("action_masks")[0]
-				else:
-					action_masks = _get_action_masks_from_obs(obs)
-				action, _ = model.predict(
-					obs, action_masks=action_masks, deterministic=True
-				)
-			else:
-				action, _ = model.predict(obs, deterministic=True)
-
-			obs, reward, terminated, truncated, info = env.step(action)
-			done = terminated or truncated
-			episode_reward += reward
-			step_count += 1
-
-			if render and step_count % 10 == 0:
-				env.render()
-
-		results["game_lengths"].append(step_count)
-		results["total_reward"] += episode_reward
-		results["episode_rewards"].append(episode_reward)
-
-		winner = info.get("winner", "unknown")
-		player_identity = info.get("player_identity", "")
-
-		results["identity_games"][player_identity] = (
-				results["identity_games"].get(player_identity, 0) + 1
-		)
-
-		is_win = False
-		if winner != "unknown" and player_identity:
-			is_win = IdentityRelationship.is_victory(player_identity, winner)
-
-		if is_win:
-			results["wins"] += 1
-			results["identity_wins"][player_identity] = (
-					results["identity_wins"].get(player_identity, 0) + 1
-			)
-		else:
-			results["losses"] += 1
-
-		round_num = info.get("round_num", 0)
-		if is_win and round_num > 0:
-			results["win_by_round"][round_num] = (
-					results["win_by_round"].get(round_num, 0) + 1
-			)
-
-		if verbose and (episode + 1) % 10 == 0:
-			win_rate = results["wins"] / (episode + 1)
-			print(
-				f"Episode {episode + 1}/{n_episodes} | "
-				f"Win rate: {win_rate:.1%} | "
-				f"Identity: {player_identity} | "
-				f"Winner: {winner} | "
-				f"Result: {'WIN' if is_win else 'LOSE'}"
-			)
-
-	results["win_rate"] = results["wins"] / n_episodes
-	results["avg_reward"] = results["total_reward"] / n_episodes
-	results["avg_game_length"] = np.mean(results["game_lengths"])
-	results["std_reward"] = np.std(results["episode_rewards"])
-
-	print(f"\n{'=' * 60}")
-	print("评估结果")
-	print(f"{'=' * 60}")
-	print(f"总对局: {results['total_episodes']}")
-	print(f"胜利: {results['wins']}")
-	print(f"失败: {results['losses']}")
-	print(f"胜率: {results['win_rate']:.2%}")
-	print(f"平均奖励: {results['avg_reward']:.2f} +/- {results['std_reward']:.2f}")
-	print(f"平均对局长度: {results['avg_game_length']:.1f} 步")
-
-	print(f"\n各身份胜率:")
-	identity_stats = []
-	for identity in ["主公", "忠臣", "反贼", "内奸"]:
-		games = results["identity_games"].get(identity, 0)
-		wins = results["identity_wins"].get(identity, 0)
-		if games > 0:
-			win_rate = wins / games
-			print(f"  {identity}: {wins}/{games} ({win_rate:.1%})")
-			identity_stats.append(
-				{
-					"identity": identity,
-					"games": games,
-					"wins": wins,
-					"win_rate": win_rate,
-				}
-			)
-
-	results["identity_stats"] = identity_stats
-
-	if save_results:
-		results_path = (
-				Path(model_path).parent
-				/ f"eval_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-		)
-		serializable_results = {
-			k: v
-			for k, v in results.items()
-			if isinstance(v, (str, int, float, list, dict))
-		}
-		with open(results_path, "w", encoding="utf-8") as f:
-			json.dump(serializable_results, f, ensure_ascii=False, indent=2)
-		print(f"\n结果已保存到: {results_path}")
-
-	env.close()
-	return results
-
-
-def evaluate_model_self_play(
-		model_path: str,
-		n_episodes: int = 100,
-		player_num: int = 5,
-		max_rounds: int = 100,
-		render: bool = False,
-		verbose: bool = True,
-		save_results: bool = False,
-):
-	"""模型自我对战评估 - 所有玩家都由模型控制"""
-
-	try:
-		from sb3_contrib import MaskablePPO
-
-		use_masking = True
-	except ImportError:
-		from stable_baselines3 import PPO as MaskablePPO
-
-		use_masking = False
-
-	config = SGSConfig(
-		player_num=player_num,
-		max_rounds=max_rounds,
-		other_player_policy="none",
-	)
-
-	env = SGSEnv(config)
-	model = MaskablePPO.load(model_path, env=env)
-
-	results = {
-		"model_path": model_path,
-		"mode": "self_play",
-		"timestamp": datetime.now().isoformat(),
-		"total_episodes": n_episodes,
-		"faction_wins": {
-			"主公忠臣": 0,
-			"反贼": 0,
-			"内奸": 0,
-		},
-		"identity_wins": {
-			"主公": 0,
-			"忠臣": 0,
-			"反贼": 0,
-			"内奸": 0,
-		},
-		"game_lengths": [],
-		"total_rounds": [],
-		"win_by_round": {},
-	}
-
-	print(f"\n{'=' * 60}")
-	print(f"模型自我对战: {model_path}")
-	print(f"对局数: {n_episodes}")
-	print(f"{'=' * 60}\n")
-
-	for episode in range(n_episodes):
-		obs, _ = env.reset(seed=episode)
-		done = False
-		step_count = 0
-
-		while not done:
-			if use_masking:
-				if hasattr(env, "action_masks"):
-					action_masks = env.action_masks()
-				elif hasattr(env, "get_attr"):
-					action_masks = env.get_attr("action_masks")[0]
-				else:
-					action_masks = _get_action_masks_from_obs(obs)
-				action, _ = model.predict(
-					obs, action_masks=action_masks, deterministic=True
-				)
-			else:
-				action, _ = model.predict(obs, deterministic=True)
-
-			obs, reward, terminated, truncated, info = env.step(action)
-			done = terminated or truncated
-			step_count += 1
-
-			if render and step_count % 10 == 0:
-				env.render()
-
-		results["game_lengths"].append(step_count)
-
-		winner = info.get("winner", "unknown")
-		round_num = info.get("round_num", 0)
-		if round_num > 0:
-			results["total_rounds"].append(round_num)
-
-		if winner == "主公":
-			results["faction_wins"]["主公忠臣"] += 1
-			results["identity_wins"]["主公"] += 1
-		elif winner == "反贼":
-			results["faction_wins"]["反贼"] += 1
-			results["identity_wins"]["反贼"] += 1
-		elif winner == "内奸":
-			results["faction_wins"]["内奸"] += 1
-			results["identity_wins"]["内奸"] += 1
-
-		if round_num > 0:
-			results["win_by_round"][winner] = results["win_by_round"].get(winner, 0) + 1
-
-		if verbose and (episode + 1) % 10 == 0:
-			print(
-				f"Episode {episode + 1}/{n_episodes} | "
-				f"Winner: {winner} | "
-				f"Rounds: {round_num} | "
-				f"Steps: {step_count}"
-			)
-
-	results["avg_game_length"] = np.mean(results["game_lengths"])
-	results["avg_rounds"] = (
-		np.mean(results["total_rounds"]) if results["total_rounds"] else 0
-	)
-
-	print(f"\n{'=' * 60}")
-	print("自我对战结果")
-	print(f"{'=' * 60}")
-	print(f"总对局: {results['total_episodes']}")
-	print(f"平均步数: {results['avg_game_length']:.1f}")
-	print(f"平均回合数: {results['avg_rounds']:.1f}")
-
-	print(f"\n阵营胜率:")
-	total = results["total_episodes"]
-	for faction, wins in results["faction_wins"].items():
-		win_rate = wins / total if total > 0 else 0
-		print(f"  {faction}: {wins}/{total} ({win_rate:.1%})")
-
-	print(f"\n身份胜率:")
-	for identity, wins in results["identity_wins"].items():
-		win_rate = wins / total if total > 0 else 0
-		print(f"  {identity}: {wins}/{total} ({win_rate:.1%})")
-
-	if save_results:
-		results_path = (
-				Path(model_path).parent
-				/ f"self_play_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-		)
-		serializable_results = {
-			k: v
-			for k, v in results.items()
-			if isinstance(v, (str, int, float, list, dict))
-		}
-		with open(results_path, "w", encoding="utf-8") as f:
-			json.dump(serializable_results, f, ensure_ascii=False, indent=2)
-		print(f"\n结果已保存到: {results_path}")
-
-	env.close()
-	return results
-
-
-def compare_with_random(
-		model_path: str,
-		n_episodes: int = 50,
-		player_num: int = 5,
-):
-	"""模型 vs 随机策略对比"""
-
-	print(f"\n{'=' * 60}")
-	print("模型 vs 随机策略对比")
-	print(f"{'=' * 60}")
-
-	model_results = evaluate_model(model_path, n_episodes, player_num, verbose=False)
-
-	print(f"\n模型胜率: {model_results['win_rate']:.2%}")
-	print(f"随机策略期望胜率: ~{100 / player_num:.1f}% (5人局)")
-
-	expected_win_rate = 1.0 / player_num
-	improvement = (
-			(model_results["win_rate"] - expected_win_rate) / expected_win_rate * 100
-	)
-
-	if model_results["win_rate"] > expected_win_rate:
-		print(f"模型比随机策略高 {improvement:.1f}%")
-	else:
-		print(f"模型比随机策略低 {-improvement:.1f}%")
-
-	return model_results
-
-
-def test_specific_scenario(
-		model_path: str,
-		identity: str = "主公",
-		n_episodes: int = 20,
-):
-	"""测试特定身份场景"""
-
-	print(f"\n{'=' * 60}")
-	print(f"测试身份: {identity}")
-	print(f"{'=' * 60}")
-
-	results = evaluate_model(model_path, n_episodes, verbose=False)
-
-	games = results["identity_games"].get(identity, 0)
-	wins = results["identity_wins"].get(identity, 0)
-
-	if games > 0:
-		win_rate = wins / games
-		print(f"{identity} 身份胜率: {win_rate:.2%} ({wins}/{games})")
-	else:
-		print(f"没有测试到 {identity} 身份的对局")
-
-	return results
-
-
-def main():
-	parser = argparse.ArgumentParser(description="评估SGS RL模型")
-	parser.add_argument("--model-path", type=str, required=True, help="模型路径")
-	parser.add_argument("--n-episodes", type=int, default=100, help="评估对局数")
-	parser.add_argument("--player-num", type=int, default=5, help="玩家数量")
-	parser.add_argument("--max-rounds", type=int, default=100, help="最大回合数")
-	parser.add_argument("--render", action="store_true", help="渲染对局")
-	parser.add_argument("--compare", action="store_true", help="与随机策略对比")
-	parser.add_argument("--identity", type=str, default=None, help="测试特定身份")
-	parser.add_argument("--save", action="store_true", help="保存评估结果")
-	parser.add_argument(
-		"--other-player-policy",
-		type=str,
-		default="rule",
-		choices=["none", "rule"],
-		help="其他玩家使用的策略: none(不出牌) 或 rule(规则AI)",
-	)
-	parser.add_argument(
-		"--self-play",
-		action="store_true",
-		help="模型自我对战模式（所有玩家由模型控制）",
-	)
-
-	args = parser.parse_args()
-
-	if args.self_play:
-		evaluate_model_self_play(
-			args.model_path,
-			args.n_episodes,
-			args.player_num,
-			args.max_rounds,
-			args.render,
-			verbose=True,
-			save_results=args.save,
-		)
-	elif args.compare:
-		compare_with_random(
-			args.model_path,
-			args.n_episodes,
-			args.player_num,
-		)
-	elif args.identity:
-		test_specific_scenario(
-			args.model_path,
-			args.identity,
-			args.n_episodes,
-		)
-	else:
-		evaluate_model(
-			args.model_path,
-			args.n_episodes,
-			args.player_num,
-			args.max_rounds,
-			args.render,
-			save_results=args.save,
-			other_player_policy=args.other_player_policy,
-		)
-
-
-if __name__ == "__main__":
-	main()
+    model_path: str,
+    num_games: int = 100,
+    player_num: int = 5,
+    opponent_pool: Optional[List[Any]] = None,
+    config: Optional[EvaluationConfig] = None,
+    vec_normalize_path: Optional[str] = None,
+) -> EvaluationResult:
+    """
+    评估模型
+
+    运行N场游戏，评估模型相对于对手池的表现。
+
+    Args:
+        model_path: 模型文件路径
+        num_games: 游戏数量
+        player_num: 每局玩家数
+        opponent_pool: 对手池（可选，默认使用规则AI）
+        config: 评估配置（可选）
+        vec_normalize_path: VecNormalize统计文件路径（可选）
+
+    Returns:
+        EvaluationResult 评估结果
+    """
+    if config is None:
+        config = EvaluationConfig(num_games=num_games, player_num=player_num)
+
+    # 设置随机种子
+    if config.seed is not None:
+        random.seed(config.seed)
+        np.random.seed(config.seed)
+
+    logger.info(f"Starting evaluation: {num_games} games, {player_num} players")
+
+    # 初始化统计
+    overall_stats = WinRateStats(name="Overall")
+    identity_tracker = IdentityTracker()
+    game_details = []
+
+    # 加载被评估模型
+    eval_ai = RLAI(
+        RLAIConfig(
+            model_path=model_path,
+            use_masking=config.use_masking,
+            deterministic=config.deterministic,
+            vec_normalize_path=vec_normalize_path,
+            player_num=player_num,
+            max_rounds=config.max_rounds,
+        )
+    )
+
+    # 运行游戏
+    for game_idx in range(num_games):
+        game_result = run_single_evaluation_game(
+            eval_ai=eval_ai,
+            player_num=player_num,
+            max_rounds=config.max_rounds,
+            opponent_pool=opponent_pool,
+            game_idx=game_idx,
+        )
+
+        # 更新统计
+        won = game_result["won"]
+        identity = game_result["identity"]
+
+        overall_stats.add_result(won)
+        identity_tracker.add_result(identity, won)
+
+        game_details.append(game_result)
+
+        if config.verbose:
+            logger.info(
+                f"Game {game_idx + 1}/{num_games}: "
+                f"{'Win' if won else 'Loss'} as {identity}"
+            )
+
+    # 计算结果
+    win_rate = overall_stats.win_rate
+    ci_low, ci_high = overall_stats.get_confidence_interval()
+
+    # 计算身份胜率
+    identity_win_rates = {}
+    for identity in ["主公", "忠臣", "反贼", "内奸"]:
+        stats = identity_tracker.get_stats(identity)
+        if stats.total > 0:
+            identity_win_rates[identity] = stats.win_rate
+
+    # 与基线比较
+    baseline_rate = get_baseline_win_rate(player_num, strategy="rule")
+    comparison = compare_to_baseline(
+        overall_stats.wins, overall_stats.total, baseline_rate=baseline_rate
+    )
+
+    # 计算ELO（基于胜率）
+    elo_rating = calculate_elo_from_win_rate(win_rate, baseline_rate)
+
+    result = EvaluationResult(
+        model_path=model_path,
+        total_games=overall_stats.total,
+        wins=overall_stats.wins,
+        win_rate=win_rate,
+        identity_win_rates=identity_win_rates,
+        elo_rating=elo_rating,
+        confidence_interval=(ci_low, ci_high),
+        comparison_to_baseline=comparison,
+        game_details=game_details,
+        metadata={
+            "player_num": player_num,
+            "max_rounds": config.max_rounds,
+            "deterministic": config.deterministic,
+            "seed": config.seed,
+        },
+    )
+
+    logger.info(f"Evaluation complete: {win_rate:.2%} win rate")
+    return result
+
+
+def run_single_evaluation_game(
+    eval_ai: RLAI,
+    player_num: int,
+    max_rounds: int,
+    opponent_pool: Optional[List[Any]],
+    game_idx: int,
+) -> Dict:
+    """
+    运行单局评估游戏
+
+    Args:
+        eval_ai: 被评估的AI
+        player_num: 玩家数量
+        max_rounds: 最大回合数
+        opponent_pool: 对手池
+        game_idx: 游戏索引
+
+    Returns:
+        游戏结果字典
+    """
+    # 创建游戏引擎
+    engine = GameEngine(player_num=player_num, max_rounds=max_rounds)
+    engine.initialize_game()
+
+    # 分配身份
+    identities = assign_random_identities(player_num)
+
+    # 确定被评估AI的位置（随机）
+    eval_player_idx = random.randint(0, player_num - 1)
+    eval_identity = identities[eval_player_idx]
+
+    # 创建对手AI
+    opponent_ais = {}
+    for i in range(player_num):
+        if i != eval_player_idx:
+            if opponent_pool:
+                # 从池采样对手
+                opponent = random.choice(opponent_pool)
+                if hasattr(opponent, "path") and opponent.path:
+                    # 是PolicyRecord，创建RLAI
+                    try:
+                        opponent_ais[i] = RLAI(
+                            RLAIConfig(
+                                model_path=opponent.path,
+                                use_masking=True,
+                                deterministic=False,
+                                player_num=player_num,
+                            )
+                        )
+                    except:
+                        # 失败则回退到规则AI
+                        opponent_ais[i] = RuleAI(RuleAIConfig())
+                else:
+                    # 默认使用规则AI
+                    opponent_ais[i] = RuleAI(RuleAIConfig())
+            else:
+                # 使用规则AI作为对手
+                opponent_ais[i] = RuleAI(RuleAIConfig())
+
+    # 运行游戏
+    winner_idx = run_game_loop(
+        engine=engine,
+        eval_ai=eval_ai,
+        eval_player_idx=eval_player_idx,
+        opponent_ais=opponent_ais,
+        max_rounds=max_rounds,
+    )
+
+    # 判断胜负
+    won = winner_idx == eval_player_idx
+
+    return {
+        "game_idx": game_idx,
+        "won": won,
+        "identity": eval_identity,
+        "eval_player_idx": eval_player_idx,
+        "winner_idx": winner_idx,
+        "rounds_played": engine.round_count if hasattr(engine, "round_count") else 0,
+    }
+
+
+def run_game_loop(
+    engine: GameEngine,
+    eval_ai: RLAI,
+    eval_player_idx: int,
+    opponent_ais: Dict[int, Any],
+    max_rounds: int,
+) -> Optional[int]:
+    """
+    运行游戏主循环
+
+    Args:
+        engine: 游戏引擎
+        eval_ai: 被评估AI
+        eval_player_idx: 被评估玩家的索引
+        opponent_ais: 对手AI字典
+        max_rounds: 最大回合数
+
+    Returns:
+        获胜者索引，None表示平局或无胜者
+    """
+    try:
+        # 简化的游戏循环
+        for _ in range(max_rounds * engine.player_num * 10):
+            current_player = engine.get_current_player()
+            if current_player is None:
+                break
+
+            if not current_player.is_alive:
+                engine.next_turn()
+                continue
+
+            player_idx = engine.players.index(current_player)
+
+            # 选择AI
+            if player_idx == eval_player_idx:
+                ai = eval_ai
+            else:
+                ai = opponent_ais.get(player_idx)
+                if ai is None:
+                    engine.next_turn()
+                    continue
+
+            # 执行动作
+            try:
+                card, target = ai.select_action(engine, current_player)
+                if card is None:
+                    # 结束回合
+                    engine.next_turn()
+                else:
+                    engine.play_card(current_player, card, target)
+            except Exception as e:
+                logger.debug(f"Action error: {e}")
+                engine.next_turn()
+
+            # 检查游戏结束
+            if hasattr(engine, "check_game_over"):
+                winner = engine.check_game_over()
+                if winner:
+                    return (
+                        engine.players.index(winner)
+                        if winner in engine.players
+                        else None
+                    )
+            elif hasattr(engine, "_winner") and engine._winner:
+                winner = engine._winner
+                return (
+                    engine.players.index(winner) if winner in engine.players else None
+                )
+
+        # 超时，根据存活人数判断
+        alive_players = [p for p in engine.players if p.is_alive]
+        if len(alive_players) == 1:
+            return engine.players.index(alive_players[0])
+
+        return None
+
+    except Exception as e:
+        logger.error(f"Game loop error: {e}")
+        return None
+
+
+def assign_random_identities(player_num: int) -> List[str]:
+    """
+    随机分配身份
+
+    Args:
+        player_num: 玩家数量
+
+    Returns:
+        身份列表
+    """
+    if player_num == 5:
+        identities = ["主公", "忠臣", "反贼", "反贼", "内奸"]
+    elif player_num == 6:
+        identities = ["主公", "忠臣", "反贼", "反贼", "反贼", "内奸"]
+    elif player_num == 8:
+        identities = ["主公", "忠臣", "忠臣", "反贼", "反贼", "反贼", "反贼", "内奸"]
+    else:
+        # 默认5人配置
+        identities = ["主公", "忠臣", "反贼", "反贼", "内奸"]
+
+    random.shuffle(identities)
+    return identities[:player_num]
+
+
+def calculate_elo_from_win_rate(win_rate: float, baseline_rate: float = 0.2) -> float:
+    """
+    从胜率计算ELO评分
+
+    基于期望胜率公式反推ELO。
+
+    Args:
+        win_rate: 观察到的胜率
+        baseline_rate: 基线胜率（用于归一化）
+
+    Returns:
+        ELO评分
+    """
+    if win_rate <= 0:
+        return 800.0
+    if win_rate >= 1:
+        return 2400.0
+
+    # ELO期望公式: E = 1 / (1 + 10^((Rb-Ra)/400))
+    # 反推: Ra = Rb - 400 * log10((1/E) - 1)
+    # 假设基线对手ELO = 1000
+    baseline_elo = 1000.0
+
+    try:
+        elo = baseline_elo - 400 * math.log10((1 / win_rate) - 1)
+    except (ValueError, ZeroDivisionError):
+        elo = 1000.0
+
+    # 限制范围
+    return max(400.0, min(2800.0, elo))
+
+
+def run_evaluation_games(
+    model_path: str,
+    num_games: int,
+    player_num: int = 5,
+    opponent_pool: Optional[List[Any]] = None,
+    config: Optional[EvaluationConfig] = None,
+    vec_normalize_path: Optional[str] = None,
+) -> EvaluationResult:
+    """
+    运行评估游戏（便捷函数）
+
+    与 evaluate_model 相同，提供更直观的命名。
+
+    Args:
+        model_path: 模型路径
+        num_games: 游戏数量
+        player_num: 玩家数量
+        opponent_pool: 对手池
+        config: 评估配置
+        vec_normalize_path: VecNormalize路径
+
+    Returns:
+        EvaluationResult
+    """
+    return evaluate_model(
+        model_path=model_path,
+        num_games=num_games,
+        player_num=player_num,
+        opponent_pool=opponent_pool,
+        config=config,
+        vec_normalize_path=vec_normalize_path,
+    )
+
+
+# 导入math模块用于ELO计算
+import math

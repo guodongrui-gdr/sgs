@@ -1006,6 +1006,21 @@ class SGSEnv(_BaseEnv):
     def _get_observation(self) -> Dict:
         state = self._get_game_state_dict()
 
+        # Add skill decision info to state for encoding
+        skill_decision = {
+            "current_step": self.current_step,
+            "decision_type": 0,
+            "options_mask": [],
+        }
+
+        if self.skill_decision_context.has_pending_decision():
+            request = self.skill_decision_context.active_request
+            skill_decision["current_step"] = 3
+            skill_decision["decision_type"] = int(request.decision_type)
+            skill_decision["options_mask"] = self._get_skill_decision_mask().tolist()
+
+        state["skill_decision"] = skill_decision
+
         encoded_state = self.state_encoder.encode(state, self.current_player_idx)
 
         mask_type, mask_card, mask_target = self._get_action_masks()
@@ -1131,21 +1146,50 @@ class SGSEnv(_BaseEnv):
 
         from ai.skill_decision import SkillDecisionType
 
+        # Initialize reward for skill decision
+        skill_reward = 0.0
+        decision_quality = 0.5  # Default quality
+        reward_context = {"skill_name": request.skill_name}
+
         if request.decision_type == SkillDecisionType.YES_NO:
             request.result = action == 1
             request.is_resolved = True
+            # YES_NO: action==1 means "是" (activate)
+            reward_context["activated"] = request.result
+            # Mark as valuable for now (can be enhanced with skill-specific logic)
+            reward_context["is_valuable"] = True
+            skill_reward = self.reward_system.skill_decision_quality_reward(
+                decision_type="YES_NO",
+                skill_name=request.skill_name,
+                context=reward_context,
+            )
 
         elif request.decision_type == SkillDecisionType.SELECT_ORDER:
             request.add_selection(action)
             if request.is_complete():
                 request.result = request.get_result()
                 request.is_resolved = True
+                # Calculate quality based on how well cards are positioned
+                # Higher quality for better card ordering
+                decision_quality = self._calculate_select_order_quality(request)
+                skill_reward = self.reward_system.skill_decision_quality_reward(
+                    decision_type="SELECT_ORDER",
+                    skill_name=request.skill_name,
+                    decision_quality=decision_quality,
+                    context=reward_context,
+                )
 
         elif request.decision_type == SkillDecisionType.SELECT_PAIR:
             request.add_selection(action)
             if request.is_complete():
                 request.result = request.get_result()
                 request.is_resolved = True
+                skill_reward = self.reward_system.skill_decision_quality_reward(
+                    decision_type="SELECT_PAIR",
+                    skill_name=request.skill_name,
+                    decision_quality=0.5,  # Default for pair selection
+                    context=reward_context,
+                )
 
         elif request.decision_type in (
             SkillDecisionType.SELECT_CARDS,
@@ -1155,6 +1199,12 @@ class SGSEnv(_BaseEnv):
             if request.is_complete():
                 request.result = request.get_result()
                 request.is_resolved = True
+                skill_reward = self.reward_system.skill_decision_quality_reward(
+                    decision_type=request.decision_type.name,
+                    skill_name=request.skill_name,
+                    decision_quality=0.5,
+                    context=reward_context,
+                )
 
         elif request.decision_type == SkillDecisionType.DISTRIBUTE:
             if request.result is None:
@@ -1165,6 +1215,13 @@ class SGSEnv(_BaseEnv):
                 self._skill_decision_step += 1
             if self._skill_decision_step >= len(request.context.get("items", [])):
                 request.is_resolved = True
+                # Check if distributing to allies
+                reward_context["ally_target"] = self._is_distribute_to_ally(request)
+                skill_reward = self.reward_system.skill_decision_quality_reward(
+                    decision_type="DISTRIBUTE",
+                    skill_name=request.skill_name,
+                    context=reward_context,
+                )
 
         if request.is_resolved:
             self.skill_decision_context.clear()
@@ -1175,8 +1232,9 @@ class SGSEnv(_BaseEnv):
         info["skill_decision"] = request.skill_name
         info["skill_decision_type"] = request.decision_type.name
         info["skill_decision_complete"] = request.is_resolved
+        info["skill_decision_reward"] = skill_reward
 
-        return obs, 0.0, False, False, info
+        return obs, skill_reward, False, False, info
 
     def _get_skill_decision_mask(self) -> np.ndarray:
         """获取技能决策的mask"""
@@ -1219,6 +1277,90 @@ class SGSEnv(_BaseEnv):
                     mask[i] = 1.0
 
         return mask
+
+    def _calculate_select_order_quality(self, request) -> float:
+        """
+        计算观星牌序质量
+        基于简单的启发式: 将更好的牌放在前面
+        Returns: quality score between 0.0 and 1.0
+        """
+        if not request.result or not hasattr(request, "options"):
+            return 0.5
+
+        options = request.options
+        result = request.result
+
+        if not options or not result:
+            return 0.5
+
+        # Simple heuristic: check if high-value cards are positioned earlier
+        # Card value estimation based on card type
+        def estimate_card_value(card) -> float:
+            """估算卡牌价值 (0.0 - 1.0)"""
+            if card is None:
+                return 0.0
+
+            card_name = getattr(card, "name", str(card))
+
+            # High value cards
+            high_value = ["桃", "无中生有", "顺手牵羊", "过河拆桥"]
+            medium_value = ["杀", "火杀", "雷杀", "闪", "酒"]
+            low_value = ["闪电", "乐不思蜀", "兵粮寸断"]
+
+            if card_name in high_value:
+                return 0.8
+            elif card_name in medium_value:
+                return 0.5
+            elif card_name in low_value:
+                return 0.2
+            return 0.4  # Default
+
+        # Calculate quality: better cards should be earlier in order
+        quality = 0.5
+        if len(result) > 1:
+            total_score = 0.0
+            for i, card_idx in enumerate(result):
+                if 0 <= card_idx < len(options):
+                    card = options[card_idx]
+                    card_value = estimate_card_value(card)
+                    # Position weight: earlier positions get higher weight for good cards
+                    position_weight = 1.0 - (i / len(result))
+                    total_score += card_value * position_weight
+
+            # Normalize to 0.0 - 1.0
+            max_possible = sum(
+                0.8 * (1.0 - (i / len(result))) for i in range(len(result))
+            )
+            if max_possible > 0:
+                quality = total_score / max_possible
+
+        return np.clip(quality, 0.0, 1.0)
+
+    def _is_distribute_to_ally(self, request) -> bool:
+        """检查分配是否主要给队友"""
+        player = self.players[self.current_player_idx]
+        current_identity = getattr(player, "identity", "")
+
+        if not request.result:
+            return True  # Default to assuming ally
+
+        from ai.reward import IdentityRelationship
+
+        ally_count = 0
+        total_count = len(request.result)
+
+        for item_idx, target_idx in request.result.items():
+            if 0 <= target_idx < len(self.players):
+                target = self.players[target_idx]
+                target_identity = getattr(target, "identity", "")
+                relationship = IdentityRelationship.get_relationship(
+                    current_identity, target_identity
+                )
+                if relationship == "ally":
+                    ally_count += 1
+
+        # Return True if majority went to allies
+        return ally_count >= (total_count / 2) if total_count > 0 else True
 
     def request_skill_decision(self, request) -> bool:
         """外部调用此方法发起技能决策请求"""

@@ -1,6 +1,6 @@
 # 三国杀 RL 训练项目 - 当前状态
 
-最后更新: 2026-03-23
+最后更新: 2026-04-02
 
 ## 项目目标
 
@@ -17,6 +17,7 @@
 - **技能决策由 RL 驱动**：技能触发后的内部决策由 RL 模型参与，而非纯规则
 - **代码推送到 GitHub**：当用户要求时执行
 - **游戏逻辑与官方规则一致**：代码实现需符合 RULES.md 官方规则
+- **支持 GUI 和 CLI 两种模式**：可通过 `python main.py --gui` 启动图形界面
 
 ---
 
@@ -169,6 +170,149 @@ obs["skill_decision_mask"] = self._get_skill_decision_mask()  # 有效选项掩�
 
 ---
 
+## Autoresearch 自动实验模式（新增）
+
+基于 karpathy/autoresearch 思想实现的自动实验系统，让 AI agent 自主进行 RL 训练实验。
+
+### 核心思想
+
+- **自主迭代**：agent 持续运行实验，不停止询问用户
+- **固定时间预算**：每次实验运行固定 10 分钟，便于比较不同架构
+- **唯一修改文件**：agent 只修改 train/train.py，不修改其他文件
+- **标准化评估**：使用固定的评估函数和指标
+
+### 文件结构
+
+| 文件                  | 用途                     | 可修改性    |
+|---------------------|------------------------|---------|
+| train/prepare.py    | 固定配置、评估函数、环境创建       | ❌ 不可修改 |
+| train/train.py      | 超参数、奖励配置、模型架构、训练循环    | ✅ 可修改   |
+| train/program.md    | agent 指令文件，指导 agent 如何实验  | 人类修改    |
+| train/results.tsv   | 实验记录（不提交到 git）        | agent 维护 |
+
+### 运行方式
+
+**启动自动实验**：
+
+```bash
+# 1. 创建实验分支
+git checkout -b autoresearch/apr2
+
+# 2. 运行单个实验（10分钟）
+python train/train.py > train/run.log 2>&1
+
+# 3. 提取结果
+grep "^win_rate:\|^mean_reward:" train/run.log
+
+# 4. 查看实验记录
+cat train/results.tsv
+```
+
+**让 agent 自主运行**：
+
+向 agent（如 Claude/Codex）发送：
+
+```
+查看 train/program.md 并启动新的自动实验！
+```
+
+agent 会按照 program.md 的指令，自主迭代实验。
+
+### 关键设计
+
+**时间预算**：固定 10 分钟（600秒）
+- 每次实验约 6 次/小时
+- 一夜（8小时）可运行约 48 次实验
+
+**评估指标**：
+- `win_rate`：游戏胜率（主要指标）
+- `mean_reward`：平均奖励（辅助指标）
+- 综合评分 = win_rate * 100 + mean_reward
+
+**agent 可修改范围**：
+- HyperparametersConfig：学习率、gamma、clip_range等
+- RewardConfig：奖励函数参数
+- ModelConfig：模型架构（MLP/Transformer）
+- train_main()：训练循环逻辑
+
+**agent 不可修改**：
+- prepare.py 中的固定配置
+- evaluate_model() 评估函数
+- 固定时间预算（10分钟）
+- 环境创建逻辑
+
+### 典型实验流程
+
+agent 的实验循环：
+
+1. 查看 git 状态
+2. 修改 train/train.py（尝试新配置）
+3. git commit
+4. 运行实验：`python train/train.py > train/run.log 2>&1`
+5. 提取结果：`grep "^win_rate:\|^mean_reward:" train/run.log`
+6. 记录到 results.tsv
+7. 如果改进，保留 commit；否则 git reset
+8. 重复循环（永不停止）
+
+### results.tsv 格式
+
+```
+commit	win_rate	mean_reward	memory_mb	status	description
+a1b2c3d	0.150000	12.34	4096.0	keep	baseline
+b2c3d4e	0.180000	15.67	4100.0	keep	increase LR to 1e-3
+c3d4e5f	0.120000	10.23	4096.0	discard	decrease gamma to 0.95
+d4e5f6g	0.000000	0.00	0.0	crash	OOM with large model
+```
+
+### 可尝试的方向
+
+1. **超参数调整**：LR、gamma、clip_range、ent_coef
+2. **奖励函数优化**：调整 win_reward、damage_reward_scale
+3. **模型架构变化**：Transformer vs MLP、网络深度/宽度
+4. **训练策略改进**：课程学习、早停、多环境训练
+
+### 与原有训练脚本的关系
+
+- `train/train_sb3.py`：保留原有训练脚本，用于完整训练
+- `train/train.py`：新增自动实验脚本，用于快速迭代
+- 两套系统并存，互不干扰
+
+---
+
+## GUI 图形界面（新增）
+
+### 功能特性
+
+基于 Pygame 实现的图形界面，提供直观的三国杀游戏体验：
+
+- **完整的游戏界面**：玩家区域、卡牌显示、手牌管理
+- **动画效果**：伤害动画、治疗动画、发牌动画、文字浮动提示
+- **交互系统**：鼠标点击选牌、目标选择、技能触发 UI
+- **响应机制**：杀/闪响应、无懈可击、技能决策界面
+- **游戏日志**：实时显示游戏事件和技能触发信息
+
+### 运行方式
+
+```bash
+# 方式 1：使用启动脚本
+bash run_gui.sh
+
+# 方式 2：直接运行
+python main.py --gui
+
+# 方式 3：在游戏中指定模式
+python main.py --gui --mode 2p  # 双人对战模式
+```
+
+### 技术实现
+
+- **动画系统**：`gui/animations.py` 管理所有动画效果
+- **渲染分离**：游戏逻辑与渲染完全分离，便于维护
+- **响应管理**：`gui/response_manager.py` 处理游戏响应请求
+- **音频支持**：`gui/audio.py` 提供音效播放
+
+---
+
 ## 训练配置
 
 ### 当前参数
@@ -217,7 +361,11 @@ SGSConfig:
 | `ai/reward.py`         | 奖励配置和计算                  |
 | `ai/action_encoder.py` | 动作编码/解码                  |
 | `ai/action_mask.py`    | 动作掩码生成                   |
-| `train/train_sb3.py`   | 训练脚本入口                   |
+| `train/train_sb3.py`   | 训练脚本入口（完整训练）             |
+| `train/train.py`       | 自动实验脚本入口（快速迭代）            |
+| `train/prepare.py`     | 自动实验固定配置和评估函数            |
+| `train/program.md`     | 自动实验 agent 指令文件           |
+| `main.py`              | 主入口，支持 GUI 和 CLI 模式      |
 
 ### 游戏引擎
 
@@ -227,6 +375,23 @@ SGSConfig:
 | `engine/event.py`       | 事件类型定义     |
 | `engine/event_bus.py`   | 事件总线（技能触发） |
 | `engine/state.py`       | 游戏状态序列化    |
+
+### GUI 图形界面（新增）
+
+| 文件                          | 用途              |
+|-----------------------------|-----------------|
+| `gui/main_window.py`        | GUI 主窗口和游戏循环     |
+| `gui/game_renderer.py`      | 游戏画面渲染          |
+| `gui/player_renderer.py`    | 玩家区域渲染          |
+| `gui/card_renderer.py`      | 卡牌渲染            |
+| `gui/ui_elements.py`        | UI 组件（按钮、对话框等）   |
+| `gui/skill_ui.py`           | 技能触发 UI 和游戏日志    |
+| `gui/animations.py`         | 动画效果            |
+| `gui/response_manager.py`   | 响应请求管理          |
+| `gui/input_handler.py`       | 输入处理            |
+| `gui/assets.py`             | 资源加载和配置         |
+| `gui/audio.py`              | 音频播放            |
+| `run_gui.sh`                | GUI 启动脚本        |
 
 ### 技能文件
 
@@ -275,25 +440,24 @@ SystemError: Objects/dictobject.c:1605: bad argument to internal function
 
 ## Git 状态
 
-### 未提交的更改
+### 工作区状态
+
+**干净** - 所有之前的更改已提交。
+
+### 新增未跟踪文件
 
 ```
-修改: engine/game_engine.py   # 白银狮子、回合阶段、deal_damage参数
-修改: engine/response.py      # 伤害计算、距离计算、武器技能
-修改: engine/judge.py         # 判定返回值、距离计算
-修改: engine/event.py         # 回合阶段事件
-修改: engine/state.py         # GamePhase 枚举
-修改: card.py                 # 银月枪
-修改: data/cards.json         # 银月枪
-修改: skills/qun.py           # deal_damage 调用
-修改: skills/wei.py           # deal_damage 调用
-修改: ai/gym_wrapper.py       # deal_damage 调用
-修改: new_main.py             # deal_damage 调用
+gui/              # GUI 图形界面模块（新增）
+run_gui.sh        # GUI 启动脚本
 ```
 
 ### 最近提交
 
-- `d5e9118` - 技能决策系统重构
+- `384c790` - fix tab
+- `dade628` - refactor: 清理无用代码和旧文件
+- `69ed7dd` - fix: 游戏规则一致性修复
+- `bacb2e0` - docs: 更新BUG_FIXES和PROJECT_STATUS，添加RULES官方规则文档
+- `d5e9118` - feat: RL训练优化与技能决策系统
 
 ---
 
@@ -315,6 +479,16 @@ SystemError: Objects/dictobject.c:1605: bad argument to internal function
     - 当前只添加了卡牌，技能尚未实现
     - 规则：你的回合外，每当你使用一张黑色手牌，可立即对攻击范围内一名角色使用一张杀
 
+5. **完善 GUI 功能**
+    - 完善技能决策 UI
+    - 优化动画效果
+    - 添加更多游戏提示
+
+6. **运行 Autoresearch 实验**
+    - 创建第一个实验分支（如 autoresearch/apr2）
+    - 运行 baseline 实验建立初始指标
+    - 让 agent 自主迭代优化模型
+
 ---
 
 ## 参考命令
@@ -323,8 +497,23 @@ SystemError: Objects/dictobject.c:1605: bad argument to internal function
 # 检查语法错误
 python3 -m py_compile ai/gym_wrapper.py
 
-# 运行训练
+# 运行训练（完整训练）
 .venv/bin/python train/train_sb3.py --n-steps 4096 --timesteps 100000 --n-envs 4
+
+# 运行自动实验（10分钟快速迭代）
+python train/train.py > train/run.log 2>&1
+
+# 提取自动实验结果
+grep "^win_rate:\|^mean_reward:" train/run.log
+
+# 验证自动实验环境
+python train/prepare.py
+
+# 运行 GUI 图形界面
+bash run_gui.sh
+
+# 或直接运行
+python main.py --gui
 
 # 查看日志
 ls -la train/logs/

@@ -1,0 +1,477 @@
+[
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test reason",
+    "timestamp": "2026-04-09T10:48:26.288164",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:48:26.288077",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-09T10:48:26.288585",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:48:26.288496",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-09T10:48:26.289038",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:48:26.288953",
+      "episodes_completed": 5,
+      "timesteps_completed": 5,
+      "win_count": 5,
+      "loss_count": 0,
+      "win_rate": 1.0,
+      "recent_win_rate": 1.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-09T10:48:26.290078",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:48:26.290052",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "MEDIUM",
+    "to_stage": "HARD",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-09T10:48:26.290216",
+    "progress": {
+      "stage": "MEDIUM",
+      "start_time": "2026-04-09T10:48:26.290083",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test reason",
+    "timestamp": "2026-04-09T10:48:42.386460",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:48:42.386361",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-09T10:48:42.387166",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:48:42.387054",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-09T10:48:42.387893",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:48:42.387745",
+      "episodes_completed": 5,
+      "timesteps_completed": 5,
+      "win_count": 5,
+      "loss_count": 0,
+      "win_rate": 1.0,
+      "recent_win_rate": 1.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-09T10:48:42.389332",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:48:42.389299",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "MEDIUM",
+    "to_stage": "HARD",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-09T10:48:42.389639",
+    "progress": {
+      "stage": "MEDIUM",
+      "start_time": "2026-04-09T10:48:42.389339",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test reason",
+    "timestamp": "2026-04-09T10:49:08.957205",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:49:08.957061",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-09T10:49:08.961144",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:49:08.960997",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-09T10:49:08.962067",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:49:08.961916",
+      "episodes_completed": 5,
+      "timesteps_completed": 5,
+      "win_count": 5,
+      "loss_count": 0,
+      "win_rate": 1.0,
+      "recent_win_rate": 1.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-09T10:49:08.966942",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-09T10:49:08.966892",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "MEDIUM",
+    "to_stage": "HARD",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-09T10:49:08.967373",
+    "progress": {
+      "stage": "MEDIUM",
+      "start_time": "2026-04-09T10:49:08.966952",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test reason",
+    "timestamp": "2026-04-10T10:15:30.280570",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-10T10:15:30.280489",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-10T10:15:30.281511",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-10T10:15:30.281420",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-10T10:15:30.282101",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-10T10:15:30.282012",
+      "episodes_completed": 5,
+      "timesteps_completed": 5,
+      "win_count": 5,
+      "loss_count": 0,
+      "win_rate": 1.0,
+      "recent_win_rate": 1.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-10T10:15:30.283228",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-10T10:15:30.283203",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "MEDIUM",
+    "to_stage": "HARD",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-10T10:15:30.283502",
+    "progress": {
+      "stage": "MEDIUM",
+      "start_time": "2026-04-10T10:15:30.283233",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test reason",
+    "timestamp": "2026-04-10T10:55:29.457205",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-10T10:55:29.457123",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-10T10:55:29.457897",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-10T10:55:29.457805",
+      "episodes_completed": 0,
+      "timesteps_completed": 0,
+      "win_count": 0,
+      "loss_count": 0,
+      "win_rate": 0.0,
+      "recent_win_rate": 0.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "test",
+    "timestamp": "2026-04-10T10:55:29.458526",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-10T10:55:29.458437",
+      "episodes_completed": 5,
+      "timesteps_completed": 5,
+      "win_count": 5,
+      "loss_count": 0,
+      "win_rate": 1.0,
+      "recent_win_rate": 1.0,
+      "advancement_checks": 0,
+      "consecutive_threshold_met": 0,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "EASY",
+    "to_stage": "MEDIUM",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-10T10:55:29.459700",
+    "progress": {
+      "stage": "EASY",
+      "start_time": "2026-04-10T10:55:29.459675",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  },
+  {
+    "from_stage": "MEDIUM",
+    "to_stage": "HARD",
+    "reason": "win rate threshold met",
+    "timestamp": "2026-04-10T10:55:29.460014",
+    "progress": {
+      "stage": "MEDIUM",
+      "start_time": "2026-04-10T10:55:29.459705",
+      "episodes_completed": 10,
+      "timesteps_completed": 10,
+      "win_count": 5,
+      "loss_count": 5,
+      "win_rate": 0.5,
+      "recent_win_rate": 0.5,
+      "advancement_checks": 1,
+      "consecutive_threshold_met": 1,
+      "eval_history": []
+    }
+  }
+]
