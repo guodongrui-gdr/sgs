@@ -264,8 +264,10 @@ class RLAI:
         if action.action_type == ActionType.USE_CARD:
             card_idx = action.card_idx
 
-            if card_idx is None or card_idx >= len(player.hand_cards):
-                logger.warning(f"Invalid card index: {card_idx}")
+            if card_idx is None or card_idx < 0 or card_idx >= len(player.hand_cards):
+                logger.debug(
+                    f"Invalid card index: {card_idx}, hand size: {len(player.hand_cards)}, ending turn"
+                )
                 return None, None
 
             card = player.hand_cards[card_idx]
@@ -279,13 +281,14 @@ class RLAI:
         if action.action_type == ActionType.DISCARD:
             card_idx = action.card_idx
 
-            if card_idx is None or card_idx >= len(player.hand_cards):
+            if card_idx is None or card_idx < 0 or card_idx >= len(player.hand_cards):
+                logger.debug(f"Invalid discard index: {card_idx}, ending turn")
                 return None, None
 
             card = player.hand_cards[card_idx]
             return card, None
 
-        logger.warning(f"Unsupported action type: {action.action_type}")
+        logger.debug(f"Unsupported action type: {action.action_type}, ending turn")
         return None, None
 
     def _get_target_by_idx(
