@@ -112,8 +112,34 @@ class RLAI:
             vec_path = Path(self.config.vec_normalize_path)
             if vec_path.exists():
                 logger.info(f"Loading VecNormalize stats from {vec_path}")
-                dummy_env = DummyVecEnv([lambda: None])
-                self.vec_normalize = VecNormalize.load(str(vec_path), dummy_env)
+                # Create a minimal environment for VecNormalize.load()
+                # VecNormalize needs an env to infer observation space
+                try:
+                    from ai.gym_wrapper import SGSEnv, SGSConfig
+
+                    dummy_env = DummyVecEnv(
+                        [
+                            lambda: SGSEnv(
+                                SGSConfig(
+                                    player_num=self.config.player_num,
+                                    max_rounds=self.config.max_rounds,
+                                )
+                            )
+                        ]
+                    )
+                    self.vec_normalize = VecNormalize.load(str(vec_path), dummy_env)
+                    logger.info("VecNormalize stats loaded successfully")
+                except Exception as e:
+                    logger.warning(f"Failed to create dummy env for VecNormalize: {e}")
+                    # Fallback: load stats directly without env (limited functionality)
+                    import pickle
+
+                    with open(vec_path, "rb") as f:
+                        stats = pickle.load(f)
+                    self.vec_normalize = None  # Can't use without proper env
+                    logger.warning(
+                        "VecNormalize stats loaded but cannot be applied without env"
+                    )
             else:
                 logger.warning(f"VecNormalize file not found: {vec_path}")
                 self.vec_normalize = None
