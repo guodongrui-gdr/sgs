@@ -28,8 +28,41 @@ from ai.rl_ai import RLAI, RLAIConfig
 from ai.rule_ai import RuleAI, RuleAIConfig
 from engine.game_engine import GameEngine
 from player.player import Player
+from skills.registry import SkillRegistry
+from config import COMMANDERS_CONFIG
 
 logger = logging.getLogger(__name__)
+
+
+def load_commanders() -> Dict:
+    """加载武将配置"""
+    with open(COMMANDERS_CONFIG, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def select_commanders(player_num: int) -> List[str]:
+    """随机选择武将"""
+    commander_configs = load_commanders()
+    available_ids = list(commander_configs.keys())
+    return random.sample(available_ids, player_num)
+
+
+def create_player(commander_id: str, commander_config: dict) -> Player:
+    """创建玩家"""
+    skill_names = commander_config.get("skills", [])
+    skills = [
+        SkillRegistry.get(name) for name in skill_names if SkillRegistry.get(name)
+    ]
+
+    return Player(
+        commander_id=commander_id,
+        commander_name=commander_config["name"],
+        nation=commander_config["nation"],
+        max_hp=commander_config["max_hp"],
+        current_hp=commander_config["max_hp"],
+        skills=skills,
+        is_human=False,
+    )
 
 
 @dataclass
@@ -229,11 +262,20 @@ def run_single_evaluation_game(
         游戏结果字典
     """
     # 创建游戏引擎
-    engine = GameEngine(player_num=player_num, max_rounds=max_rounds)
-    engine.initialize_game()
+    commander_ids = select_commanders(player_num)
+    engine = GameEngine(player_num=player_num, commander_ids=commander_ids)
 
-    # 分配身份
-    identities = assign_random_identities(player_num)
+    # 创建玩家
+    commander_configs = load_commanders()
+    players = []
+    for i, cid in enumerate(commander_ids):
+        player = create_player(cid, commander_configs[cid])
+        players.append(player)
+
+    engine.setup_game(players)
+
+    # 身份已在setup_game中分配，获取被评估玩家的身份
+    identities = [p.identity for p in engine.players]
 
     # 确定被评估AI的位置（随机）
     eval_player_idx = random.randint(0, player_num - 1)
@@ -310,19 +352,14 @@ def run_game_loop(
         获胜者索引，None表示平局或无胜者
     """
     try:
-        # 简化的游戏循环
         for _ in range(max_rounds * engine.player_num * 10):
-            current_player = engine.get_current_player()
-            if current_player is None:
-                break
-
+            current_player = engine.players[engine.current_player_idx]
             if not current_player.is_alive:
                 engine.next_turn()
                 continue
 
-            player_idx = engine.players.index(current_player)
+            player_idx = engine.current_player_idx
 
-            # 选择AI
             if player_idx == eval_player_idx:
                 ai = eval_ai
             else:
@@ -331,34 +368,22 @@ def run_game_loop(
                     engine.next_turn()
                     continue
 
-            # 执行动作
             try:
                 card, target = ai.select_action(engine, current_player)
                 if card is None:
-                    # 结束回合
                     engine.next_turn()
                 else:
-                    engine.play_card(current_player, card, target)
+                    engine.use_card(current_player, card, target)
             except Exception as e:
                 logger.debug(f"Action error: {e}")
                 engine.next_turn()
 
-            # 检查游戏结束
-            if hasattr(engine, "check_game_over"):
-                winner = engine.check_game_over()
-                if winner:
-                    return (
-                        engine.players.index(winner)
-                        if winner in engine.players
-                        else None
-                    )
-            elif hasattr(engine, "_winner") and engine._winner:
+            if engine._winner:
                 winner = engine._winner
                 return (
                     engine.players.index(winner) if winner in engine.players else None
                 )
 
-        # 超时，根据存活人数判断
         alive_players = [p for p in engine.players if p.is_alive]
         if len(alive_players) == 1:
             return engine.players.index(alive_players[0])
