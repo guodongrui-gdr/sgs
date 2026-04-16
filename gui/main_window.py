@@ -84,6 +84,7 @@ class GameWindow:
 
         self.player_num = 5
         self.ai_delay = 400
+        self.mappo_ai = None
 
         self._setup_menu_buttons()
         self._setup_key_bindings()
@@ -513,6 +514,10 @@ class GameWindow:
         self.selected_targets.clear()
         self.animation_manager.clear()
 
+        ai_type = self.settings_panel.get("ai_type", "heuristic")
+        if ai_type == "mappo":
+            self._init_mappo_ai()
+
         audio.play("card_use")
 
         self._log("=" * 30)
@@ -526,6 +531,35 @@ class GameWindow:
         if skills:
             self._log(f"技能: {', '.join(skills)}")
         self._log("=" * 30)
+
+    def _init_mappo_ai(self):
+        from ai.mappo_inference import create_mappo_ai
+        from pathlib import Path
+
+        model_path = self.settings_panel.get("mappo_model_path", "")
+        if not model_path:
+            default_path = (
+                Path(__file__).parent.parent
+                / "train"
+                / "logs"
+                / "mappo_50k"
+                / "mappo_team_20260416_084048"
+                / "mappo_world_model_final.pt"
+            )
+            if default_path.exists():
+                model_path = str(default_path)
+            else:
+                self._log("MAPPO 模型未找到，使用规则AI")
+                return
+
+        try:
+            self.mappo_ai = create_mappo_ai(
+                model_path=model_path, player_num=self.player_num
+            )
+            self._log(f"MAPPO AI 已加载: {Path(model_path).name}")
+        except Exception as e:
+            self._log(f"MAPPO AI 加载失败: {e}")
+            self.mappo_ai = None
 
     def _setup_game(self, player_num: int) -> GameEngine:
         config_path = Path(__file__).parent.parent / "data" / "commanders.json"
@@ -892,6 +926,41 @@ class GameWindow:
         self._log(f"{player.commander_name} 摸 {len(drawn)} 张牌")
 
     def _ai_play_phase(self, player: Player):
+        if self.mappo_ai is not None:
+            self._ai_play_phase_mappo(player)
+        else:
+            self._ai_play_phase_heuristic(player)
+
+    def _ai_play_phase_mappo(self, player: Player):
+        max_actions = 15
+        action_count = 0
+
+        while action_count < max_actions and player.is_alive:
+            action_count += 1
+
+            card, target = self.mappo_ai.select_action(self.engine, player)
+
+            if card is None and target is None:
+                break
+
+            if card is not None:
+                success = self.engine.use_card(player, card, target)
+                target_name = target.commander_name if target else ""
+                self._log(
+                    f"{player.commander_name} 使用 {card.name}"
+                    + (f" → {target_name}" if target_name else "")
+                )
+
+                if target and target != player and is_sha_card(card):
+                    self._play_damage_animation(target)
+
+                pygame.time.wait(150)
+            else:
+                break
+
+        player.reset_turn_state()
+
+    def _ai_play_phase_heuristic(self, player: Player):
         used_sha = False
         max_actions = 12
         action_count = 0

@@ -318,8 +318,19 @@ def run_single_evaluation_game(
         max_rounds=max_rounds,
     )
 
-    # 判断胜负
-    won = winner_idx == eval_player_idx
+    # 判断胜负 - 修复：使用身份判断团队胜利，而不是比较玩家索引
+    # 忠臣随主公胜利，内奸单独胜利
+    if engine._winner:
+        if engine._winner == "主公":
+            won = eval_identity in ["主公", "忠臣"]
+        elif engine._winner == "反贼":
+            won = eval_identity == "反贼"
+        elif engine._winner == "内奸":
+            won = eval_identity == "内奸"
+        else:
+            won = False
+    else:
+        won = False
 
     return {
         "game_idx": game_idx,
@@ -351,6 +362,8 @@ def run_game_loop(
     Returns:
         获胜者索引，None表示平局或无胜者
     """
+    from engine.state import GamePhase
+
     try:
         for _ in range(max_rounds * engine.player_num * 10):
             current_player = engine.players[engine.current_player_idx]
@@ -360,6 +373,39 @@ def run_game_loop(
 
             player_idx = engine.current_player_idx
 
+            # Run judge phase
+            engine.phase = GamePhase.JUDGE_PHASE
+            judge_result = engine.judge_phase(current_player)
+
+            # Handle lightning damage
+            if judge_result.get("lightning_damage", 0) > 0:
+                engine.deal_damage(
+                    None,
+                    current_player,
+                    None,
+                    judge_result["lightning_damage"],
+                    True,
+                    False,
+                    True,
+                )
+
+            if not current_player.is_alive:
+                engine.next_turn()
+                continue
+
+            # Draw phase
+            if not judge_result.get("skip_draw", False):
+                drawn = engine.draw_cards(current_player, 2)
+                current_player.hand_cards.extend(drawn)
+
+            # Skip play phase if needed
+            if judge_result.get("skip_play", False):
+                engine.next_turn()
+                continue
+
+            # Play phase
+            engine.phase = GamePhase.PLAY_PHASE
+
             if player_idx == eval_player_idx:
                 ai = eval_ai
             else:
@@ -368,21 +414,69 @@ def run_game_loop(
                     engine.next_turn()
                     continue
 
-            try:
-                card, target = ai.select_action(engine, current_player)
-                if card is None:
-                    engine.next_turn()
-                else:
-                    engine.use_card(current_player, card, target)
-            except Exception as e:
-                logger.debug(f"Action error: {e}")
-                engine.next_turn()
+            # Execute turn actions
+            max_actions = 10
+            for action_num in range(max_actions):
+                try:
+                    card, target = ai.select_action(engine, current_player)
+                    if card is None:
+                        break  # End turn
+                    else:
+                        if isinstance(card, int):
+                            # Skill index - needs special handling
+                            from skills.base import ActiveSkill
+
+                            skills = getattr(current_player, "skills", [])
+                            if card < len(skills):
+                                skill = skills[card]
+                                if isinstance(skill, ActiveSkill):
+                                    from engine.event import Event, EventType
+
+                                    event = Event(
+                                        type=EventType.SKILL_TRIGGERED,
+                                        source=current_player,
+                                        target=target,
+                                        engine=engine,
+                                    )
+                                    if skill.can_activate(event, engine):
+                                        skill.execute(event, engine)
+                        else:
+                            success = engine.use_card(current_player, card, target)
+                            if not success:
+                                logger.debug(
+                                    f"Card use failed: {card.name if hasattr(card, 'name') else card}"
+                                )
+                except Exception as e:
+                    logger.debug(f"Action error: {e}")
+                    break
+
+            # End turn and discard phase
+            hand_limit = max(
+                0, getattr(current_player, "hand_limit", current_player.current_hp)
+            )
+            while len(current_player.hand_cards) > hand_limit:
+                if current_player.hand_cards:
+                    card = current_player.hand_cards.pop()
+                    engine.discard_pile.append(card)
+
+            engine.next_turn()
 
             if engine._winner:
-                winner = engine._winner
-                return (
-                    engine.players.index(winner) if winner in engine.players else None
-                )
+                # Winner is an identity string (主公/反贼/内奸), find matching player
+                winner_identity = engine._winner
+                # Find the winning player based on identity
+                for i, p in enumerate(engine.players):
+                    if p.is_alive and p.identity == winner_identity:
+                        return i
+                # If no single winner (team win), return the eval player if they're on winning team
+                eval_player = engine.players[eval_player_idx]
+                if eval_player.is_alive and eval_player.identity == winner_identity:
+                    return eval_player_idx
+                # Otherwise, return any alive player with winning identity
+                for i, p in enumerate(engine.players):
+                    if p.is_alive and p.identity == winner_identity:
+                        return i
+                return None
 
         alive_players = [p for p in engine.players if p.is_alive]
         if len(alive_players) == 1:

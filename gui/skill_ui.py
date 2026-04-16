@@ -237,8 +237,10 @@ class SettingsPanel:
             "volume": 0.7,
             "show_log": True,
             "animation_speed": 1.0,
+            "ai_type": "heuristic",  # "heuristic" or "mappo"
+            "mappo_model_path": "",  # Path to MAPPO model
         }
-        self.rect = pygame.Rect(0, 0, 500, 400)
+        self.rect = pygame.Rect(0, 0, 500, 480)
         self.rect.center = (WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2)
 
         self._sliders = {}
@@ -272,6 +274,14 @@ class SettingsPanel:
             log_btn = pygame.Rect(self.rect.x + 30, self.rect.y + 160, 200, 40)
             if log_btn.collidepoint(mouse_pos):
                 self.settings["show_log"] = not self.settings["show_log"]
+                return True
+
+            ai_btn = pygame.Rect(self.rect.x + 30, self.rect.y + 220, 200, 40)
+            if ai_btn.collidepoint(mouse_pos):
+                current = self.settings["ai_type"]
+                self.settings["ai_type"] = (
+                    "mappo" if current == "heuristic" else "heuristic"
+                )
                 return True
 
         elif event.type == pygame.MOUSEMOTION and pygame.mouse.get_pressed()[0]:
@@ -341,12 +351,26 @@ class SettingsPanel:
         log_surface = font_medium.render(log_text, True, COLORS["button_text"])
         surface.blit(log_surface, log_surface.get_rect(center=log_btn.center))
 
+        ai_label = font_medium.render("AI 类型", True, COLORS["text_normal"])
+        surface.blit(ai_label, (self.rect.x + 30, self.rect.y + 215))
+
+        ai_btn = pygame.Rect(self.rect.x + 30, self.rect.y + 240, 200, 40)
+        ai_color = (
+            COLORS["button_hover"]
+            if self.settings["ai_type"] == "mappo"
+            else COLORS["hp_empty"]
+        )
+        pygame.draw.rect(surface, ai_color, ai_btn, border_radius=5)
+        ai_text = "MAPPO" if self.settings["ai_type"] == "mappo" else "规则AI"
+        ai_surface = font_medium.render(ai_text, True, COLORS["button_text"])
+        surface.blit(ai_surface, ai_surface.get_rect(center=ai_btn.center))
+
         volume_label = font_medium.render(
             f"音量: {int(self.settings['volume'] * 100)}%", True, COLORS["text_normal"]
         )
-        surface.blit(volume_label, (self.rect.x + 30, self.rect.y + 220))
+        surface.blit(volume_label, (self.rect.x + 30, self.rect.y + 300))
 
-        volume_slider = pygame.Rect(self.rect.x + 30, self.rect.y + 260, 440, 20)
+        volume_slider = pygame.Rect(self.rect.x + 30, self.rect.y + 340, 440, 20)
         pygame.draw.rect(surface, COLORS["hp_empty"], volume_slider, border_radius=5)
 
         filled_width = int(volume_slider.width * self.settings["volume"])

@@ -154,6 +154,11 @@ class RLAI:
         """
         选择要执行的动作
 
+        使用与训练相同的3-step hierarchical action selection:
+        - Step 0: 选择动作类型 (action_type = model output directly)
+        - Step 1: 选择卡牌/技能 (card_idx = model output directly)
+        - Step 2: 选择目标 (target_idx = model output directly)
+
         Args:
                 engine: 游戏引擎
                 player: 当前玩家
@@ -162,10 +167,15 @@ class RLAI:
                 (card, target) - 要使用的卡牌和目标，如果结束回合则返回 (None, None)
         """
         try:
-            obs = self._encode_observation(engine, player)
+            # 获取游戏状态以确定当前阶段
+            game_state_dict = self._get_game_state_dict(engine)
+            phase = game_state_dict.get("phase", "waiting")
+            if hasattr(phase, "value"):
+                phase = phase.value
 
-            # CRITICAL FIX: Generate and pass action_masks to MaskablePPO
-            action_masks = self._get_action_masks(engine, player)
+            # Step 0: 选择动作类型
+            obs = self._encode_observation(engine, player)
+            action_masks = self._get_action_masks_for_step(engine, player, step=0)
 
             if self.use_masking and hasattr(self.model, "predict"):
                 action, _ = self.model.predict(
@@ -179,35 +189,297 @@ class RLAI:
                     deterministic=self.config.deterministic,
                 )
 
-            hierarchical_action = self._decode_action(action)
+            action_type = int(action)  # 直接使用模型输出作为action_type
 
-            return self._execute_action(hierarchical_action, player, engine)
+            # 如果是结束回合或跳过，直接返回
+            if action_type == ActionType.END_TURN:
+                return None, None
+            if action_type == ActionType.PASS:
+                return None, None
+
+            # 检查是否需要选择卡牌
+            needs_card = self.action_encoder.needs_card(action_type)
+            if not needs_card:
+                # 不需要卡牌，检查是否需要目标
+                needs_target = self.action_encoder.needs_target(action_type)
+                if needs_target:
+                    # 需要目标，进入Step 2
+                    target_masks = self._get_action_masks_for_step(
+                        engine, player, step=2, pending_action_type=action_type
+                    )
+                    target_obs = self._encode_observation_for_step(
+                        engine, player, step=2, pending_action_type=action_type
+                    )
+                    if self.use_masking:
+                        target_action, _ = self.model.predict(
+                            target_obs,
+                            action_masks=target_masks,
+                            deterministic=self.config.deterministic,
+                        )
+                    else:
+                        target_action, _ = self.model.predict(
+                            target_obs,
+                            deterministic=self.config.deterministic,
+                        )
+                    target_idx = int(target_action)
+                    return self._execute_simple_action(
+                        action_type, target_idx, player, engine
+                    )
+                else:
+                    # 不需要卡牌也不需要目标，直接执行
+                    return self._execute_simple_action(
+                        action_type, None, player, engine
+                    )
+
+            # Step 1: 选择卡牌/技能
+            card_masks = self._get_action_masks_for_step(
+                engine, player, step=1, pending_action_type=action_type
+            )
+            card_obs = self._encode_observation_for_step(
+                engine, player, step=1, pending_action_type=action_type
+            )
+
+            if self.use_masking:
+                card_action, _ = self.model.predict(
+                    card_obs,
+                    action_masks=card_masks,
+                    deterministic=self.config.deterministic,
+                )
+            else:
+                card_action, _ = self.model.predict(
+                    card_obs,
+                    deterministic=self.config.deterministic,
+                )
+
+            card_idx = int(card_action)  # 直接使用模型输出作为card_idx
+
+            # 检查是否需要选择目标
+            if action_type == ActionType.USE_SKILL:
+                skills = getattr(player, "skills", [])
+                skill = skills[card_idx] if card_idx < len(skills) else None
+                needs_target = self.action_encoder.needs_target(action_type, skill)
+            else:
+                hand_cards = player.hand_cards
+                card = hand_cards[card_idx] if card_idx < len(hand_cards) else None
+                needs_target = self.action_encoder.needs_target(action_type, card)
+
+            if not needs_target:
+                # 不需要目标，直接执行
+                return self._execute_hierarchical_action(
+                    action_type, card_idx, None, player, engine
+                )
+
+            # Step 2: 选择目标
+            target_masks = self._get_action_masks_for_step(
+                engine,
+                player,
+                step=2,
+                pending_action_type=action_type,
+                pending_card_idx=card_idx,
+            )
+            target_obs = self._encode_observation_for_step(
+                engine,
+                player,
+                step=2,
+                pending_action_type=action_type,
+                pending_card_idx=card_idx,
+            )
+
+            if self.use_masking:
+                target_action, _ = self.model.predict(
+                    target_obs,
+                    action_masks=target_masks,
+                    deterministic=self.config.deterministic,
+                )
+            else:
+                target_action, _ = self.model.predict(
+                    target_obs,
+                    deterministic=self.config.deterministic,
+                )
+
+            target_idx = int(target_action)  # 直接使用模型输出作为target_idx
+
+            return self._execute_hierarchical_action(
+                action_type, card_idx, target_idx, player, engine
+            )
 
         except Exception as e:
             logger.error(f"Error in RL action selection: {e}", exc_info=True)
             return None, None
 
-    def _get_action_masks(self, engine: GameEngine, player: Player) -> np.ndarray:
-        """获取动作掩码用于MaskablePPO预测"""
+    def _get_action_masks_for_step(
+        self,
+        engine: GameEngine,
+        player: Player,
+        step: int = 0,
+        pending_action_type: Optional[int] = None,
+        pending_card_idx: Optional[int] = None,
+    ) -> np.ndarray:
+        """获取指定步骤的动作掩码，格式与训练时的action_masks()一致
+
+        Args:
+            engine: 游戏引擎
+            player: 当前玩家
+            step: 当前步骤 (0=选类型, 1=选卡牌, 2=选目标)
+            pending_action_type: 待完成的动作类型
+            pending_card_idx: 待完成的卡牌索引
+
+        Returns:
+            action_dim大小的掩码数组，掩码内容放在开头位置
+        """
         game_state_dict = self._get_game_state_dict(engine)
-        game_state_dict["action_history"] = []
+
+        # 创建pending_action用于Step 1和Step 2
+        pending_action = None
+        if pending_action_type is not None:
+            pending_action = HierarchicalAction(
+                action_type=pending_action_type,
+                card_idx=pending_card_idx,
+            )
 
         type_mask, card_mask, target_mask = self.action_mask_generator.generate_masks(
             game_state=game_state_dict,
             player=player,
             engine=engine,
+            current_step=step,
+            pending_action=pending_action,
         )
 
-        # Combine masks into single array matching action space dimension
+        # 创建action_dim大小的掩码，与gym_wrapper.py一致
         action_dim = self.action_encoder.get_action_space_dim()
-        combined_mask = np.zeros(action_dim, dtype=np.float32)
+        result = np.zeros(action_dim, dtype=np.float32)
 
-        # For step 0 (action type selection), use type_mask
-        combined_mask[: len(type_mask)] = type_mask
-        if type_mask.sum() == 0:
-            combined_mask[0] = 1.0  # Fallback to prevent empty mask
+        if step == 0:
+            result[: len(type_mask)] = type_mask
+            if type_mask.sum() == 0:
+                result[0] = 1.0  # Fallback to END_TURN
+        elif step == 1:
+            result[: len(card_mask)] = card_mask
+            if card_mask.sum() == 0:
+                result[0] = 1.0  # Fallback
+        elif step == 2:
+            result[: len(target_mask)] = target_mask
+            if target_mask.sum() == 0:
+                result[0] = 1.0  # Fallback
 
-        return combined_mask
+        return result
+
+    def _encode_observation_for_step(
+        self,
+        engine: GameEngine,
+        player: Player,
+        step: int = 0,
+        pending_action_type: Optional[int] = None,
+        pending_card_idx: Optional[int] = None,
+    ) -> Dict:
+        """编码指定步骤的游戏状态为观察
+
+        Args:
+            engine: 游戏引擎
+            player: 当前玩家
+            step: 当前步骤
+            pending_action_type: 待完成的动作类型
+            pending_card_idx: 待完成的卡牌索引
+
+        Returns:
+            包含state和各层掩码的观察字典
+        """
+        game_state_dict = self._get_game_state_dict(engine)
+        player_idx = player.idx - 1
+
+        state = self.state_encoder.encode(game_state_dict, player_idx)
+
+        pending_action = None
+        if pending_action_type is not None:
+            pending_action = HierarchicalAction(
+                action_type=pending_action_type,
+                card_idx=pending_card_idx,
+            )
+
+        type_mask, card_mask, target_mask = self.action_mask_generator.generate_masks(
+            game_state=game_state_dict,
+            player=player,
+            engine=engine,
+            current_step=step,
+            pending_action=pending_action,
+        )
+
+        obs = {
+            "state": state.astype(np.float32),
+            "action_mask_type": type_mask.astype(np.float32),
+            "action_mask_card": card_mask.astype(np.float32),
+            "action_mask_target": target_mask.astype(np.float32),
+            "current_step": step,
+        }
+
+        return obs
+
+    def _execute_simple_action(
+        self,
+        action_type: int,
+        target_idx: Optional[int],
+        player: Player,
+        engine: GameEngine,
+    ) -> Tuple[Optional[Any], Optional[Any]]:
+        """执行不需要卡牌选择的动作"""
+        target = None
+        if target_idx is not None:
+            target = self._get_target_by_idx(target_idx, engine, player)
+
+        # 返回None表示结束回合（对于END_TURN/PASS）
+        return None, target
+
+    def _execute_hierarchical_action(
+        self,
+        action_type: int,
+        card_idx: int,
+        target_idx: Optional[int],
+        player: Player,
+        engine: GameEngine,
+    ) -> Tuple[Optional[Any], Optional[Any]]:
+        """执行分层动作（需要卡牌选择）"""
+        if action_type == ActionType.USE_CARD:
+            if card_idx < 0 or card_idx >= len(player.hand_cards):
+                logger.warning(
+                    f"Invalid card index: {card_idx}, hand size: {len(player.hand_cards)}"
+                )
+                return None, None
+
+            card = player.hand_cards[card_idx]
+            target = None
+            if target_idx is not None:
+                target = self._get_target_by_idx(target_idx, engine, player)
+
+            return card, target
+
+        elif action_type == ActionType.USE_SKILL:
+            skills = getattr(player, "skills", [])
+            if card_idx < 0 or card_idx >= len(skills):
+                logger.warning(
+                    f"Invalid skill index: {card_idx}, skills count: {len(skills)}"
+                )
+                return None, None
+
+            # 技能执行需要通过engine，返回None表示技能已触发
+            # 实际上返回技能索引让后续处理
+            target = None
+            if target_idx is not None:
+                target = self._get_target_by_idx(target_idx, engine, player)
+
+            # 对于技能，返回特殊标记让调用者知道需要触发技能
+            return card_idx, target  # card_idx作为技能索引
+
+        elif action_type == ActionType.DISCARD:
+            if card_idx < 0 or card_idx >= len(player.hand_cards):
+                logger.warning(f"Invalid discard index: {card_idx}")
+                return None, None
+
+            card = player.hand_cards[card_idx]
+            return card, None
+
+        else:
+            logger.warning(f"Unsupported action type: {action_type}")
+            return None, None
 
     def _get_game_state_dict(self, engine: GameEngine) -> Dict:
         """获取游戏状态字典"""
@@ -238,58 +510,6 @@ class RLAI:
         }
 
         return obs
-
-    def _decode_action(
-        self,
-        action: int,
-    ) -> HierarchicalAction:
-        """解码动作为分层动作"""
-        return self.action_encoder.decode_flat(action)
-
-    def _execute_action(
-        self,
-        action: HierarchicalAction,
-        player: Player,
-        engine: GameEngine,
-    ) -> Tuple[Optional[Any], Optional[Any]]:
-        """
-        将分层动作转换为游戏动作
-
-        Returns:
-                (card, target) 或 (None, None) 表示结束回合
-        """
-        if action.action_type == ActionType.END_TURN:
-            return None, None
-
-        if action.action_type == ActionType.USE_CARD:
-            card_idx = action.card_idx
-
-            if card_idx is None or card_idx < 0 or card_idx >= len(player.hand_cards):
-                logger.debug(
-                    f"Invalid card index: {card_idx}, hand size: {len(player.hand_cards)}, ending turn"
-                )
-                return None, None
-
-            card = player.hand_cards[card_idx]
-
-            target = None
-            if action.target_idx is not None:
-                target = self._get_target_by_idx(action.target_idx, engine, player)
-
-            return card, target
-
-        if action.action_type == ActionType.DISCARD:
-            card_idx = action.card_idx
-
-            if card_idx is None or card_idx < 0 or card_idx >= len(player.hand_cards):
-                logger.debug(f"Invalid discard index: {card_idx}, ending turn")
-                return None, None
-
-            card = player.hand_cards[card_idx]
-            return card, None
-
-        logger.debug(f"Unsupported action type: {action.action_type}, ending turn")
-        return None, None
 
     def _get_target_by_idx(
         self,

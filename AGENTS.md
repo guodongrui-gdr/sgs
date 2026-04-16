@@ -1,87 +1,262 @@
 # 三国杀 (SGS) RL Training Project
 
-**Generated:** 2026-04-09
-**Commit:** 171cf24
+**Generated:** 2026-04-16
 **Branch:** autoresearch/apr8
 
 ## Overview
 
-Three Kingdoms card game (三国杀) with reinforcement learning training. Python 3.10+ game engine with PyGame GUI, Stable-Baselines3 RL training, and transformer-based policy networks.
+Three Kingdoms card game (三国杀) with reinforcement learning training. Python 3.10+ game engine with PyGame GUI, Stable-Baselines3 RL training (MaskablePPO, IPPO, MAPPO), and transformer-based policy networks.
+
+## Quick Start
+
+```bash
+# GUI mode (recommended for human play)
+./run_gui.sh
+source .venv/bin/activate && python main.py --gui
+
+# CLI mode
+python main.py --player-num 5
+
+# Quick training test
+.venv/bin/python train/train_self_play.py --test-mode
+
+# Run tests
+pytest tests/
+```
+
+## Environment Setup
+
+### Virtual Environment
+```bash
+source .venv/bin/activate
+# Python 3.10+ required, CUDA 12.8 for GPU training
+```
+
+### Dependencies
+Core: `torch`, `stable_baselines3`, `sb3_contrib`, `gymnasium`, `numpy`, `pygame`
+Dev: `pytest`, `tensorboard`, `matplotlib`, `rich`
+
+**No requirements.txt** - generate with `.venv/bin/pip freeze > requirements.txt`
 
 ## Structure
 
 ```
 sgs/
-├── main.py              # Entry: CLI + GUI modes
-├── config.py            # Global config, paths, constants
-├── engine/              # Core game engine (event-driven)
-├── ai/                  # RL agents, Gym environment, policies
-├── gui/                 # PyGame GUI (rendering, animations)
-├── skills/              # 43 skills by faction (Wei/Shu/Wu/Qun)
-├── train/               # Training scripts, curriculum, evaluation
+├── main.py              # Entry: CLI + GUI modes, RL model loading
+├── config.py            # Global config, paths, VERBOSE flag
+├── engine/              # Core game engine (event-driven, 40+ event types)
+├── ai/                  # RL agents, Gym environment, state/action encoding
+├── gui/                 # PyGame GUI (1029-line main_window.py)
+├── skills/              # 43+ skills by faction (Wei/Shu/Wu/Qun)
+├── train/               # 8 training scripts + evaluation
 ├── card/                # Card types and factory
-├── player/              # Player dataclass
+├── player/              # Player dataclass with linked list seating
 ├── data/                # JSON configs (cards.json, commanders.json)
-└── tests/               # pytest test suites
+├── config/              # YAML configs (world_model_config.yaml)
+├── tests/               # pytest + unittest test suites
+├── docs/                # Architecture and training documentation
+└── 素材/                # GUI assets (backgrounds, buttons)
 ```
 
 ## Where to Look
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add new skill | `skills/{faction}.py` → register in `skills/__init__.py` | Use `@skill_decorator` |
+| Add new skill | `skills/{faction}.py` → `@SkillRegistry.register` | Use TriggerSkill/ActiveSkill base |
 | Add new card | `card/base.py` + `data/cards.json` | Extend Card hierarchy |
-| Modify game rules | `engine/game_engine.py` + `engine/response.py` | Core logic |
-| Train RL agent | `train/train_sb3.py` or `train/final_training.py` | Use MaskablePPO |
-| GUI changes | `gui/main_window.py` (state) + `gui/game_renderer.py` (render) | PyGame |
-| Add AI behavior | `ai/rl_ai.py` (RL) or `ai/rule_ai.py` (heuristic) | Implement AIInterface |
-| Debug skills | `skills/base.py` → set `VERBOSE=True` in config.py | verbose_print |
-| View training logs | `train/logs/{timestamp}/` | TensorBoard in `MaskablePPO_1/` |
+| Modify game rules | `engine/game_engine.py` + `engine/response.py` | 883 lines, 35 methods |
+| Self-play training | `train/train_self_play.py` | MaskablePPO, agent pool |
+| MAPPO training | `train/train_mappo.py` | Centralized critic |
+| World model | `train/train_dynamics.py` + `train/train_mixed.py` | RSSM imagination |
+| GUI changes | `gui/main_window.py` (state) + `gui/game_renderer.py` | 1029 lines, 46 methods |
+| Debug skills | `config.py` → `VERBOSE = True` | verbose_print output |
+| View training logs | `train/logs/{timestamp}/` | TensorBoard in `tensorboard/` |
+
+## Training Commands
+
+### Self-Play Training (Primary)
+```bash
+# Quick test (1000 steps, single env)
+.venv/bin/python train/train_self_play.py --test-mode
+
+# Standard training (2M steps, 8 envs)
+.venv/bin/python train/train_self_play.py --timesteps 2000000 --n-envs 8
+
+# Resume from checkpoint
+.venv/bin/python train/train_self_play.py --resume train/logs/xxx/step_1600000.zip
+```
+
+### MAPPO Training
+```bash
+# Quick test
+.venv/bin/python train/train_mappo.py --steps 100 --n-envs 1
+
+# Full training
+.venv/bin/python train/train_mappo.py --steps 50000 --n-envs 4 --device cuda
+```
+
+### IPPO Global Baseline
+```bash
+.venv/bin/python train/train_ippo_global.py --steps 10000 --n-envs 4
+```
+
+### World Model Training
+```bash
+# Dynamics model
+.venv/bin/python train/train_dynamics.py --steps 50000
+
+# Mixed real/imagined
+.venv/bin/python train/train_mixed.py --steps 50000 --warmup 10000
+```
+
+### Model Evaluation
+```bash
+.venv/bin/python train/evaluate_model.py --model-type ippo --model-path path/to/model.zip --num-episodes 100
+```
+
+### Training Arguments (train_self_play.py)
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--timesteps` | 2M | Total training steps |
+| `--n-envs` | 8 | Parallel environments |
+| `--pool-size` | 10 | Agent pool for self-play |
+| `--checkpoint-freq` | 100K | Checkpoint interval |
+| `--test-mode` | False | Quick 1000-step test |
+
+### Shell Scripts
+```bash
+./scripts/start_training.sh       # Self-play launcher (1M steps)
+./scripts/continue_training.sh    # Resume from checkpoint
+./scripts/monitor_training.sh     # Progress monitor
+./scripts/rollback_to_ippo.sh     # Disable World Model/MAPPO
+```
+
+## Testing
+
+```bash
+# Run full suite
+pytest tests/
+
+# Run specific file
+pytest tests/test_curriculum.py
+
+# Run specific test
+pytest tests/test_curriculum.py::TestCurriculumStage::test_stage_ordering
+
+# Pattern match
+pytest tests/ -k "belief"
+
+# unittest alternative
+python -m unittest discover tests/
+
+# Special standalone script
+python tests/validation_ab_test.py --steps 1000
+```
+
+### Test Categories
+
+| Category | Files | Focus |
+|----------|-------|-------|
+| Core Training | `test_curriculum.py`, `test_extended_training.py` | Curriculum, checkpoints |
+| RL Agents | `test_mappo.py`, `test_ippo_global_env.py` | MAPPO, IPPO |
+| World Model | `test_imagination_env.py`, `world_model/` | RSSM, dynamics |
+| Self-Play | `test_self_play.py`, `test_agent_pool_manager.py` | Policy pool, ELO |
+| Belief | `test_belief_update.py`, `test_identity_belief_encoding.py` | Identity tracking |
 
 ## Conventions
 
-**Type Safety**: All functions annotated. Use `TYPE_CHECKING` for circular imports.
+### TYPE_CHECKING Pattern (Universal)
+All modules avoid circular imports:
 ```python
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from player.player import Player
+    from engine.game_engine import GameEngine
 ```
 
-**Dataclasses**: Configs, states, DTOs use `@dataclass` with type annotations.
+### Conditional Imports for Optional Dependencies
+ML libraries guarded with availability flags:
+```python
+try:
+    from stable_baselines3 import PPO
+    SB3_AVAILABLE = True
+except ImportError:
+    SB3_AVAILABLE = False
+```
+
+### Dataclasses with ABC
+Core classes combine both:
 ```python
 @dataclass
-class SGSConfig:
-    player_num: int = 5
-    max_rounds: int = 15
+class Skill(ABC):
+    name: str
+    trigger_events: List["EventType"]
+    
+    @abstractmethod
+    def can_activate(self, event, engine) -> bool:
+        pass
 ```
 
-**Enums**: EventTypes, ActionTypes, GamePhases use `Enum` or `IntEnum`.
+### Enums for Types
 ```python
 class EventType(Enum):
     GAME_START = auto()
-    TURN_START = auto()
+    DAMAGE_TAKEN = auto()  # 40+ event types
 ```
 
-**Chinese Identifiers**: Game concepts use Chinese (主公, 忠臣, 反贼, 内奸) in config and UI.
+### Registry Pattern
+Skills auto-register via decorator:
+```python
+@SkillRegistry.register
+class JianXiong(TriggerSkill):
+    def __init__(self):
+        super().__init__(name="奸雄", trigger_events=[EventType.DAMAGE_TAKEN])
+```
+
+### Factory Pattern
+```python
+class CardFactory:
+    @classmethod
+    def create(cls, config: Dict) -> List[Card]:
+        card_class = cls._type_mapping.get(card_type, BasicCard)
+```
+
+### Chinese Identifiers
+Game concepts use Chinese in config and UI:
+```python
+IDENTITY_CONFIG = {5: ["主公", "忠臣", "反贼", "反贼", "内奸"]}
+player.equipment = {"武器": None, "防具": None}
+```
+
+### Linked List Seating
+Players connected circularly:
+```python
+player.next_player: Optional["Player"]
+player.prev_player: Optional["Player"]
+```
+
+### VERBOSE Debug Flag
+```python
+# config.py
+VERBOSE = False  # Set True for skill debug output
+from config import verbose_print as print
+```
 
 ## Anti-Patterns (CRITICAL)
 
 ### Card Type Checking
-
-**NEVER use string matching for 杀 (Sha) cards:**
 ```python
 # WRONG - misses 火杀, 雷杀
 if "杀" in card.name: ...
 if card.name == "杀": ...
 
-# CORRECT - use type checking
+# CORRECT
 from card.base import is_sha_card
 if is_sha_card(card): ...
 ```
 
 ### Card Attributes
-
-**ALWAYS use getattr with defaults:**
 ```python
 # WRONG - may raise AttributeError
 card.is_elemental
@@ -92,67 +267,85 @@ getattr(card, "is_fire", False)
 ```
 
 ### Distance Calculation
-
-Distance must be **bidirectional minimum**:
+Must be bidirectional minimum:
 ```python
 dist = min(dist_forward, dist_backward)
 ```
 
-### Damage Propagation
-
-When propagating chain damage (铁索连环), **preserve elemental attributes**:
+### Event Card Null Check
 ```python
-self._propagate_chain_damage(source, target, card, damage, is_fire, is_thunder)
+# WRONG - crashes if event.card is None
+if event.card.name == "杀": ...
+
+# CORRECT
+if not event.card: return event
+if is_sha_card(event.card): ...
 ```
 
-## Unique Styles
+### Skill Name Checking
+```python
+# WRONG
+if "反馈" in player.skills: ...
 
-**Event-Driven Architecture**: EventBus → Skills → GameEngine. Skills subscribe to EventTypes.
+# CORRECT
+SkillRegistry.has_skill("反馈")
+```
 
-**Registry Pattern**: `SkillRegistry` auto-discovers skills via `@skill_decorator`.
+## Data Files
 
-**Factory Pattern**: `CardFactory` creates cards from JSON config.
+| File | Contents |
+|------|----------|
+| `data/cards.json` | 160+ cards (basic, tricks, equipment) |
+| `data/commanders.json` | 22 commanders (Wei/Shu/Wu/Qun) |
+| `素材/` | GUI assets (背景.jpg, 结束.jpg, buttons) |
+| `config/world_model_config.yaml` | World model architecture settings |
 
-**Skill Decision System**: RL-driven skill decisions via `ai/skill_decision.py` - skills can request RL input for complex decisions (观星牌序, 遗计分配).
+## Training Outputs
 
-**Training Artifact Isolation**: Each run creates timestamped dir: `train/logs/final_training_{YYYYMMDD}_{HHMMSS}/`
+Each run creates timestamped directory: `train/logs/{script}_{YYYYMMDD}_{HHMMSS}/`
 
-## Commands
+Contains:
+- `checkpoints/step_XXXXXX.zip` - Model checkpoints
+- `final_model.zip` - Final model
+- `vecnormalize.pkl` - VecNormalize statistics (required for inference)
+- `evaluation_report.json` - Final win rates
+- `tensorboard/` - TensorBoard logs
+
+View logs:
+```bash
+tensorboard --logdir train/logs/
+```
+
+## Model Loading
 
 ```bash
-# GUI mode
-python main.py --gui
-./run_gui.sh
+# CLI with trained model
+python main.py --ai-type rl --model-path train/logs/xxx/final_model.zip
 
-# CLI mode
-python main.py --player-num 5
-
-# Train RL agent
-.venv/bin/python train/train_sb3.py --n-steps 4096 --timesteps 100000 --n-envs 4
-
-# Quick training test
-.venv/bin/python train/train_sb3.py --n-steps 256 --timesteps 500 --n-envs 1
-
-# Run tests
-pytest tests/
-python -m unittest discover tests/
-
-# Load trained model
-python main.py --ai-type rl --model-path train/logs/{run}/final_model.zip
+# MAPPO model (.pt file)
+python main.py --ai-type mappo --model-path train/logs/xxx/mappo_checkpoint.pt
 ```
+
+## Architecture Notes
+
+- **Event-Driven**: EventBus → Skills → GameEngine. 40+ event types for fine-grained skill triggering.
+- **Hierarchical Actions**: Three-step decoding (action_type → card_idx → target_idx)
+- **Action Masks**: Always use masks to filter invalid actions. Pass to `model.predict(obs, action_masks=masks)`
+- **State Encoding**: Fixed ~3000-dim vectors (padded, not variable length)
+- **Skill Decision System**: Skills can request RL decisions via `ai/skill_decision.py` (观星牌序, 遗计分配)
 
 ## Notes
 
-- **No requirements.txt**: Dependencies managed via `.venv/`. Run `.venv/bin/pip freeze > requirements.txt` to create.
-- **GPU Training**: Requires CUDA 12.8. Models use torch + stable-baselines3.
-- **Missing pyproject.toml**: Project lacks formal packaging. Install dependencies directly in venv.
-- **LSP Errors**: 405 diagnostics in train/*.py mostly from optional imports (SB3 availability checks).
-- **Large Files**: `ai/gym_wrapper.py` (1290 lines), `gui/main_window.py` (1029 lines) - complex, may need refactoring.
-- **Bilingual Docs**: BUG_FIXES.md, PROJECT_STATUS.md, RULES.md in Chinese.
-- **Autoresearch Mode**: See `train/program.md` for automated experiment workflow.
+- **GPU Optional**: CPU fallback available, GPU (CUDA 12.8) recommended for full training
+- **No pyproject.toml**: Project lacks formal packaging
+- **Large Files**: `ai/gym_wrapper.py` (1290 lines), `gui/main_window.py` (1029 lines)
+- **Bilingual Docs**: BUG_FIXES.md, RULES.md, PROJECT_STATUS.md in Chinese
+- **VecNormalize Required**: Load stats with model checkpoints for correct inference
 
-## Dependencies
+## Key Documentation
 
-Core: `torch`, `stable_baselines3`, `gymnasium`, `numpy`, `pygame`
-ML: `sb3_contrib` (MaskablePPO), `tensorboard`
-Dev: `pytest`, `matplotlib`, `rich`
+- `docs/WORLD_MODEL_MAPPO.md` - World model integration phases
+- `docs/training_pipeline.md` - Extended training workflow
+- `docs/FINAL_REPORT.md` - Training results summary
+- `BUG_FIXES.md` - Rule fixes log (白银狮子, 藤甲, 铁索连环)
+- `RULES.md` - Official game rules reference

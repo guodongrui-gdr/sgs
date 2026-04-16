@@ -934,7 +934,23 @@ class SGSEnv(_BaseEnv):
         if "反贼" not in alive_identities and "内奸" not in alive_identities:
             return "主公"
 
-        return "unknown"
+        if "主公" in alive_identities:
+            lord_alive = True
+            loyalist_alive = "忠臣" in alive_identities
+            rebel_alive = "反贼" in alive_identities
+            spy_alive = "内奸" in alive_identities
+
+            lord_team_count = 1 + (1 if loyalist_alive else 0)
+            rebel_team_count = sum(1 for id in alive_identities if id == "反贼")
+
+            if lord_alive and not rebel_alive:
+                return "主公"
+            elif lord_alive and lord_team_count >= rebel_team_count:
+                return "主公"
+            else:
+                return "反贼"
+
+        return "反贼"
 
     def _calculate_reward(self) -> float:
         player = self.players[self.current_player_idx]
@@ -1094,12 +1110,21 @@ class SGSEnv(_BaseEnv):
     def _get_info(self) -> Dict:
         player = self.players[self.current_player_idx] if self.players else None
 
+        latest_action = self.action_history[-1] if self.action_history else None
+        target_idx = latest_action.get("target_idx") if latest_action else None
+        card_type = latest_action.get("card_name", "") if latest_action else ""
+        damage = getattr(self, "_pending_rewards", 0.0)
+
         return {
             "current_player_idx": self.current_player_idx,
             "player_identity": player.identity if player else "",
             "round_num": self.round_count,
             "phase": self.engine.phase.value if self.engine else "waiting",
             "action_history": self.action_history[-5:],
+            "target_idx": target_idx,
+            "card_type": card_type,
+            "damage": damage,
+            "action_type": latest_action.get("action_type") if latest_action else None,
         }
 
     def render(self, mode: str = "human"):

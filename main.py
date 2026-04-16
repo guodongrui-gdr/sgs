@@ -789,14 +789,14 @@ def main():
         "--ai-type",
         type=str,
         default="random",
-        choices=["random", "rule", "rl"],
-        help="AI类型: random(随机), rule(规则), rl(强化学习)",
+        choices=["random", "rule", "rl", "mappo"],
+        help="AI类型: random(随机), rule(规则), rl(SB3模型), mappo(MAPPO模型)",
     )
     parser.add_argument(
         "--model-path",
         type=str,
         default=None,
-        help="RL模型文件路径 (仅当 --ai-type=rl 时需要)",
+        help="模型文件路径 (.zip for rl, .pt for mappo)",
     )
     parser.add_argument("--player-num", type=int, default=5, help="玩家数量 (默认: 5)")
 
@@ -847,6 +847,43 @@ def main():
             print("模型加载成功!\n")
         except Exception as e:
             print(f"模型加载失败: {e}")
+            print("回退到随机AI")
+            args.ai_type = "random"
+
+    elif args.ai_type == "mappo":
+        if not args.model_path:
+            print("错误: 使用MAPPO AI需要指定 --model-path 参数 (.pt文件)")
+            print("\n可用的MAPPO模型:")
+            train_logs = Path(__file__).parent / "train" / "logs"
+            if train_logs.exists():
+                for log_dir in sorted(train_logs.iterdir(), reverse=True):
+                    if log_dir.is_dir():
+                        for checkpoint_file in log_dir.glob("*.pt"):
+                            if "mappo" in str(checkpoint_file) or "final" in str(
+                                checkpoint_file
+                            ):
+                                print(f"  {checkpoint_file}")
+            return
+
+        if not args.model_path.endswith(".pt"):
+            print("错误: MAPPO模型必须是 .pt 文件")
+            return
+
+        try:
+            print(f"\n正在加载MAPPO模型: {args.model_path}")
+            from ai.mappo_inference import create_mappo_ai
+
+            rl_ai = create_mappo_ai(
+                model_path=args.model_path,
+                player_num=player_num,
+                deterministic=True,
+            )
+            print("MAPPO模型加载成功!\n")
+        except Exception as e:
+            print(f"MAPPO模型加载失败: {e}")
+            import traceback
+
+            traceback.print_exc()
             print("回退到随机AI")
             args.ai_type = "random"
 
