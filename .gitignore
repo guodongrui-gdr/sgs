@@ -16,3 +16,7 @@ train/logs/
 train/results.tsv
 .env
 .env.local
+.opencode/
+.sisyphus/evidence/
+.sisyphus/drafts/
+.sisyphus/run-continuation/

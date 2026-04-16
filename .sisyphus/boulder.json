@@ -1,23 +1,12 @@
 {
-  "active_plan": "/home/gdr/code/sgs/.sisyphus/plans/new-training-system.md",
-  "started_at": "2026-04-10T08:21:55.957Z",
+  "active_plan": "/home/gdr/code/sgs/.sisyphus/plans/world-model-marl-integration.md",
+  "started_at": "2026-04-15T02:49:50.313Z",
   "session_ids": [
-    "ses_289f18932ffeMLIP7fTKnQ274H"
+    "ses_274eed44affecuI4zC1DP1fHI2"
   ],
   "session_origins": {
-    "ses_289f18932ffeMLIP7fTKnQ274H": "direct"
+    "ses_274eed44affecuI4zC1DP1fHI2": "direct"
   },
-  "plan_name": "new-training-system",
-  "agent": "atlas",
-  "task_sessions": {
-    "todo:1": {
-      "task_key": "todo:1",
-      "task_label": "1",
-      "task_title": "**训练配置系统** - train/config.py + tests/test_config.py",
-      "session_id": "ses_28983b3f2ffeS5V5weAt3ZvdqV",
-      "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-04-10T08:38:34.096Z"
-    }
-  }
+  "plan_name": "world-model-marl-integration",
+  "agent": "Sisyphus"
 }
