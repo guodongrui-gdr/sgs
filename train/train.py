@@ -1,8 +1,25 @@
 """
-Enhanced Training Script
+Unified SGS RL Training Script
 
-Multi-agent training with independent agent learning.
-Each agent learns independently with shared global value function.
+Supports multiple training modes:
+- Independent: Multi-agent training with independent learning (default)
+- IPPO: Independent PPO (decentralized)
+- World Model Train: Train World Model dynamics/reward models (Phase 1)
+- IPPO + World Model: IPPO with imagination-based training (Phase 2)
+- Self-Play: Self-play training with agent pool
+
+Usage:
+    # Independent training (default)
+    python train/train.py --mode independent --steps 100000
+
+    # IPPO training
+    python train/train.py --mode ippo --steps 100000 --n-envs 8
+
+    # World Model training (Phase 1)
+    python train/train.py --mode world_model_train --steps 50000
+
+    # Quick test
+    python train/train.py --mode independent --steps 1000 --n-envs 1
 """
 
 import argparse
@@ -36,42 +53,7 @@ logging.getLogger("engine.game_engine").setLevel(logging.ERROR)
 from ai.gym_wrapper import SGSConfig, SGSEnv
 from ai.state_encoder import StateEncoder
 from ai.independent_trainer import IndependentAgentTrainer, IndependentAgentConfig
-
-
-class TrainingConfig:
-    """Training configuration."""
-
-    def __init__(
-        self,
-        steps_total: int = 100000,
-        steps_per_rollout: int = 256,
-        n_envs: int = 1,
-        batch_size: int = 64,
-        n_epochs: int = 10,
-        eval_interval: int = 5000,
-        checkpoint_interval: int = 10000,
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        num_eval_episodes: int = 10,
-        eval_deterministic: bool = True,
-        use_team_rewards: bool = False,
-        lord_loyalist_coordination_bonus: float = 2.0,
-        rebel_focus_fire_bonus: float = 1.5,
-        protect_lord_bonus: float = 3.0,
-    ):
-        self.steps_total = steps_total
-        self.steps_per_rollout = steps_per_rollout
-        self.n_envs = n_envs
-        self.batch_size = batch_size
-        self.n_epochs = n_epochs
-        self.eval_interval = eval_interval
-        self.checkpoint_interval = checkpoint_interval
-        self.device = device
-        self.num_eval_episodes = num_eval_episodes
-        self.eval_deterministic = eval_deterministic
-        self.use_team_rewards = use_team_rewards
-        self.lord_loyalist_coordination_bonus = lord_loyalist_coordination_bonus
-        self.rebel_focus_fire_bonus = rebel_focus_fire_bonus
-        self.protect_lord_bonus = protect_lord_bonus
+from train.config import TrainingConfig, TrainingMode
 
 
 @dataclass
@@ -222,12 +204,23 @@ class CoordinationTracker:
 class Trainer:
     """Main trainer for independent multi-agent learning."""
 
-    def __init__(self, config: Optional[TrainingConfig] = None):
-        self.config = config or TrainingConfig()
-        self.device = self.config.device
+    def __init__(self, config: TrainingConfig):
+        self.config = config
+
+        # Device setup
+        if config.device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device(config.device)
+        logger.info(f"Using device: {self.device}")
 
         # Create environment
-        env_config = SGSConfig()
+        env_config = SGSConfig(
+            player_num=config.num_agents,
+            max_rounds=config.max_rounds,
+            use_action_mask=config.use_action_mask,
+            use_shaping=config.use_shaping,
+        )
         self.env = SGSEnv(env_config)
 
         # State encoder
@@ -235,10 +228,10 @@ class Trainer:
 
         # Agent trainer
         agent_config = IndependentAgentConfig(
-            num_agents=5,
-            local_state_dim=2670,
-            action_dim=45,
-            global_state_dim=2670 * 5,
+            num_agents=config.num_agents,
+            local_state_dim=config.local_state_dim,
+            action_dim=config.action_dim,
+            global_state_dim=config.global_state_dim,
             device=self.device,
         )
         self.trainer = IndependentAgentTrainer(agent_config).to(self.device)
@@ -246,27 +239,27 @@ class Trainer:
         self._episode_count = 0
         self._step_count = 0
 
-        log_dir = Path("logs/independent")
+        log_dir = Path(config.output_dir) / "independent"
         log_dir.mkdir(parents=True, exist_ok=True)
         self.writer = SummaryWriter(log_dir=str(log_dir))
 
         # Team reward allocator (optional)
         self.team_reward_allocator = None
-        if self.config.use_team_rewards:
+        if config.use_team_rewards:
             from ai.mappo.team_rewards import TeamRewardAllocator, TeamRewardConfig
 
             reward_config = TeamRewardConfig(
-                lord_loyalist_coordination_bonus=self.config.lord_loyalist_coordination_bonus,
-                rebel_focus_fire_bonus=self.config.rebel_focus_fire_bonus,
-                protect_lord_bonus=self.config.protect_lord_bonus,
+                lord_loyalist_coordination_bonus=config.lord_loyalist_coordination_bonus,
+                rebel_focus_fire_bonus=config.rebel_focus_fire_bonus,
+                protect_lord_bonus=config.protect_lord_bonus,
             )
             self.team_reward_allocator = TeamRewardAllocator(
-                config=reward_config, num_agents=5
+                config=reward_config, num_agents=config.num_agents
             )
             logger.info("TeamRewardAllocator initialized")
 
         # Coordination tracking
-        self.coordination_tracker = CoordinationTracker(self.config)
+        self.coordination_tracker = CoordinationTracker(config)
 
     def _get_global_state(self, env: SGSEnv) -> np.ndarray:
         """Get global state by encoding all agents."""
@@ -651,15 +644,45 @@ class Trainer:
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--steps", type=int, default=10000)
+    """Main entry point for unified SGS RL training.
+
+    Supports multiple training modes:
+    - independent: Independent multi-agent training (default, recommended for beginners)
+    - ippo: Independent PPO with decentralized training
+    - world_model_train: Train World Model dynamics/reward models (Phase 1)
+    - ippo_world_model: IPPO with World Model imagination (Phase 2, needs Phase 1)
+    - self_play: Self-play training with agent pool
+
+    Note: MAPPO is excluded because SanGuoSha is turn-based,
+          making simultaneous multi-agent steps inappropriate.
+    """
+    parser = argparse.ArgumentParser(description="SGS RL Unified Training")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="independent",
+        choices=[
+            "independent",
+            "ippo",
+            "world_model_train",
+            "ippo_world_model",
+            "self_play",
+        ],
+        help="Training mode (default: independent)",
+    )
+    parser.add_argument(
+        "--steps", type=int, default=100000, help="Total training steps"
+    )
     parser.add_argument("--steps-per-rollout", type=int, default=256)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--n-epochs", type=int, default=10)
+    parser.add_argument("--n-envs", type=int, default=8)
+    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
     parser.add_argument(
-        "--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu"
+        "--device", type=str, default=None, help="Device (cuda/cpu, auto if None)"
     )
     parser.add_argument("--eval-interval", type=int, default=5000)
+    parser.add_argument("--checkpoint-interval", type=int, default=10000)
     parser.add_argument("--num-eval-episodes", type=int, default=10)
     parser.add_argument(
         "--use-team-rewards", type=str, default="false", choices=["true", "false"]
@@ -667,26 +690,140 @@ def main():
     parser.add_argument("--lord-loyalist-coordination-bonus", type=float, default=2.0)
     parser.add_argument("--rebel-focus-fire-bonus", type=float, default=1.5)
     parser.add_argument("--protect-lord-bonus", type=float, default=3.0)
+    parser.add_argument("--seed", type=int, default=None, help="Random seed")
+
+    # World Model flags
+    parser.add_argument(
+        "--use-world-model", type=str, default="false", choices=["true", "false"]
+    )
+    parser.add_argument("--dynamics-checkpoint", type=str, default=None)
+    parser.add_argument("--policy-checkpoint", type=str, default=None)
+
+    # Self-play flags
+    parser.add_argument("--pool-size", type=int, default=10)
+    parser.add_argument(
+        "--timesteps",
+        type=int,
+        default=None,
+        help="Self-play total timesteps (overrides --steps)",
+    )
+
     args = parser.parse_args()
 
+    # Parse flags
     use_team_rewards = args.use_team_rewards.lower() == "true"
+    use_world_model = args.use_world_model.lower() == "true"
+
+    # Map mode string to enum
+    mode_map = {
+        "independent": TrainingMode.INDEPENDENT,
+        "ippo": TrainingMode.IPPO,
+        "world_model_train": TrainingMode.WORLD_MODEL_TRAIN,
+        "ippo_world_model": TrainingMode.IPPO_WORLD_MODEL,
+        "self_play": TrainingMode.SELF_PLAY,
+    }
+    mode = mode_map.get(args.mode, TrainingMode.INDEPENDENT)
 
     config = TrainingConfig(
+        mode=mode,
         steps_total=args.steps,
         steps_per_rollout=args.steps_per_rollout,
+        n_envs=args.n_envs,
         batch_size=args.batch_size,
+        learning_rate=args.lr,
         n_epochs=args.n_epochs,
         device=args.device,
         eval_interval=args.eval_interval,
+        checkpoint_interval=args.checkpoint_interval,
         num_eval_episodes=args.num_eval_episodes,
         use_team_rewards=use_team_rewards,
         lord_loyalist_coordination_bonus=args.lord_loyalist_coordination_bonus,
         rebel_focus_fire_bonus=args.rebel_focus_fire_bonus,
         protect_lord_bonus=args.protect_lord_bonus,
+        use_world_model=use_world_model,
+        seed=args.seed,
     )
 
-    trainer = Trainer(config)
-    trainer.train()
+    if args.dynamics_checkpoint:
+        config.dynamics_checkpoint_path = args.dynamics_checkpoint
+    if args.policy_checkpoint:
+        config.policy_checkpoint_path = args.policy_checkpoint
+    if args.pool_size:
+        config.pool_size = args.pool_size
+
+    logger.info("=" * 60)
+    logger.info(f"SGS RL Training - Mode: {mode.value.upper()}")
+    logger.info("=" * 60)
+    logger.info(
+        f"Steps: {config.steps_total}, Envs: {config.n_envs}, LR: {config.learning_rate}"
+    )
+    logger.info(f"Device: {config.device or 'auto'}")
+    if use_world_model:
+        logger.info(f"World Model enabled, dynamics: {config.dynamics_checkpoint_path}")
+    if use_team_rewards:
+        logger.info("Team Rewards enabled")
+    logger.info("=" * 60)
+
+    # Route to appropriate trainer
+    if mode == TrainingMode.INDEPENDENT:
+        trainer = Trainer(config)
+        trainer.train()
+    elif mode == TrainingMode.IPPO:
+        logger.info("IPPO mode: Using decentralized training")
+        from train.train_mappo_world_model import (
+            MAPPOWorldModelTrainer,
+            MAPPOWorldModelConfig,
+        )
+
+        ippo_config = MAPPOWorldModelConfig(
+            steps_total=config.steps_total,
+            n_envs=config.n_envs,
+            use_mappo=False,  # Force IPPO (decentralized)
+            use_world_model=False,
+            use_team_rewards=config.use_team_rewards,
+            device=config.device,
+        )
+        trainer = MAPPOWorldModelTrainer(ippo_config)
+        trainer.train()
+    elif mode == TrainingMode.WORLD_MODEL_TRAIN:
+        logger.info("World Model Training (Phase 1)")
+        from train.train_dynamics import DynamicsTrainer, DynamicsTrainingConfig
+
+        wm_config = DynamicsTrainingConfig(
+            total_steps=config.steps_total,
+            n_envs=config.n_envs,
+            device=config.device,
+        )
+        trainer = DynamicsTrainer(wm_config)
+        trainer.train()
+    elif mode == TrainingMode.IPPO_WORLD_MODEL:
+        logger.info("IPPO + World Model (Phase 2)")
+        from train.train_mappo_world_model import (
+            MAPPOWorldModelTrainer,
+            MAPPOWorldModelConfig,
+        )
+
+        ippo_wm_config = MAPPOWorldModelConfig(
+            steps_total=config.steps_total,
+            n_envs=config.n_envs,
+            use_mappo=False,  # Force IPPO (decentralized)
+            use_world_model=True,
+            dynamics_checkpoint_path=config.dynamics_checkpoint_path,
+            use_team_rewards=config.use_team_rewards,
+            device=config.device,
+        )
+        trainer = MAPPOWorldModelTrainer(ippo_wm_config)
+        trainer.train()
+    elif mode == TrainingMode.SELF_PLAY:
+        logger.info("Self-Play mode")
+        timesteps = args.timesteps or config.steps_total
+        from train.train_self_play import train
+
+        train(timesteps=timesteps, n_envs=config.n_envs)
+    else:
+        raise ValueError(f"Unknown training mode: {mode}")
+
+    logger.info(f"Training completed: {mode.value}")
 
 
 if __name__ == "__main__":
