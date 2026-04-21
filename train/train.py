@@ -270,16 +270,30 @@ class Trainer:
         return local_obs.flatten()
 
     def _get_action_mask(self, env: SGSEnv, player_idx: int) -> np.ndarray:
-        """Get action mask for a specific player."""
+        """Get action mask for a specific player based on current step."""
         game_state = env._get_game_state_dict()
         player = env.players[player_idx]
         type_mask, card_mask, target_mask = env.action_mask_generator.generate_masks(
             game_state, player, env.engine, 0, None
         )
-        combined = np.concatenate([type_mask, card_mask, target_mask])
-        if len(combined) < 45:
-            combined = np.pad(combined, (0, 45 - len(combined)))
-        return combined[:45]
+
+        # Use the mask corresponding to current_step
+        # current_step 0: action_type, 1: card, 2: target
+        if env.current_step == 0:
+            mask = type_mask
+        elif env.current_step == 1:
+            mask = card_mask
+        elif env.current_step == 2:
+            mask = target_mask
+        else:
+            # Default fallback
+            mask = type_mask
+
+        # Pad/truncate to action_dim (default 20)
+        action_dim = self.config.action_dim
+        if len(mask) < action_dim:
+            mask = np.pad(mask, (0, action_dim - len(mask)))
+        return mask[:action_dim]
 
     def _get_action_type_str(self, action_type: int) -> str:
         """Convert action type enum to string."""
