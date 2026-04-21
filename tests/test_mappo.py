@@ -37,7 +37,9 @@ class TestCentralizedCritic:
         critic = CentralizedCritic(config)
         batch_size = 4
         global_state = torch.randn(batch_size, config.global_state_dim)
-        joint_actions = torch.randint(0, config.action_dim, (batch_size, config.num_agents))
+        joint_actions = torch.randint(
+            0, config.action_dim, (batch_size, config.num_agents)
+        )
         values = critic(global_state, joint_actions)
         assert values.shape == (batch_size,)
         assert not torch.isnan(values).any()
@@ -94,7 +96,9 @@ class TestMAPPOActor:
         actor = MAPPOActor(config)
         local_obs = torch.randn(1, config.local_state_dim)
         action_mask = torch.ones(1, config.action_dim)
-        action, log_prob, entropy = actor.get_action(local_obs, action_mask, deterministic=False)
+        action, log_prob, entropy = actor.get_action(
+            local_obs, action_mask, deterministic=False
+        )
         assert action.shape == (1,)
         assert action.item() >= 0 and action.item() < config.action_dim
         assert log_prob.shape == (1,)
@@ -147,9 +151,15 @@ class TestMAPPOAgent:
         config = MAPPOAgentConfig()
         agent = MAPPOAgent(config)
         batch_size = 2
-        local_obs = torch.randn(batch_size, config.num_agents, agent.actor_config.local_state_dim)
-        action_masks = torch.ones(batch_size, config.num_agents, agent.actor_config.action_dim)
-        joint_actions, log_probs, entropies, mean_entropy = agent.get_actions(local_obs, action_masks)
+        local_obs = torch.randn(
+            batch_size, config.num_agents, agent.actor_config.local_state_dim
+        )
+        action_masks = torch.ones(
+            batch_size, config.num_agents, agent.actor_config.action_dim
+        )
+        joint_actions, log_probs, entropies, mean_entropy = agent.get_actions(
+            local_obs, action_masks
+        )
         assert joint_actions.shape == (batch_size, config.num_agents)
         assert log_probs.shape == (batch_size, config.num_agents)
         assert entropies.shape == (batch_size, config.num_agents)
@@ -161,7 +171,9 @@ class TestMAPPOAgent:
         agent = MAPPOAgent(config)
         batch_size = 2
         global_state = torch.randn(batch_size, agent.critic_config.global_state_dim)
-        joint_actions = torch.randint(0, agent.critic_config.action_dim, (batch_size, config.num_agents))
+        joint_actions = torch.randint(
+            0, agent.critic_config.action_dim, (batch_size, config.num_agents)
+        )
         values = agent.get_centralized_value(global_state, joint_actions)
         assert values.shape == (batch_size,)
 
@@ -184,12 +196,18 @@ class TestMAPPOAgent:
         T = 32
         batch = {
             "global_states": torch.randn(T, agent.critic_config.global_state_dim),
-            "local_observations": torch.randn(T, config.num_agents, agent.actor_config.local_state_dim),
-            "joint_actions": torch.randint(0, agent.critic_config.action_dim, (T, config.num_agents)),
+            "local_observations": torch.randn(
+                T, config.num_agents, agent.actor_config.local_state_dim
+            ),
+            "joint_actions": torch.randint(
+                0, agent.critic_config.action_dim, (T, config.num_agents)
+            ),
             "old_log_probs": torch.randn(T, config.num_agents),
             "advantages": torch.randn(T),
             "returns": torch.randn(T),
-            "action_masks": torch.ones(T, config.num_agents, agent.actor_config.action_dim),
+            "action_masks": torch.ones(
+                T, config.num_agents, agent.actor_config.action_dim
+            ),
         }
         metrics = agent.update(batch, n_epochs=1, batch_size=16)
         assert "policy_loss" in metrics
@@ -203,12 +221,18 @@ class TestMAPPOAgent:
         T = 32
         batch = {
             "global_states": torch.randn(T, agent.critic_config.global_state_dim),
-            "local_observations": torch.randn(T, config.num_agents, agent.actor_config.local_state_dim),
-            "joint_actions": torch.randint(0, agent.critic_config.action_dim, (T, config.num_agents)),
+            "local_observations": torch.randn(
+                T, config.num_agents, agent.actor_config.local_state_dim
+            ),
+            "joint_actions": torch.randint(
+                0, agent.critic_config.action_dim, (T, config.num_agents)
+            ),
             "old_log_probs": torch.randn(T, config.num_agents),
             "advantages": torch.randn(T),
             "returns": torch.randn(T),
-            "action_masks": torch.ones(T, config.num_agents, agent.actor_config.action_dim),
+            "action_masks": torch.ones(
+                T, config.num_agents, agent.actor_config.action_dim
+            ),
         }
         agent.update(batch, n_epochs=1, batch_size=16)
         health = agent.check_training_health()
@@ -231,12 +255,20 @@ class TestMAPPOIntegration:
     def test_full_forward_pass(self):
         actor_config = MAPPOActorConfig()
         critic_config = CentralizedCriticConfig()
-        agent_config = MAPPOAgentConfig(actor_config=actor_config, critic_config=critic_config)
+        agent_config = MAPPOAgentConfig(
+            actor_config=actor_config, critic_config=critic_config
+        )
         agent = MAPPOAgent(agent_config)
         batch_size = 2
-        local_obs = torch.randn(batch_size, agent_config.num_agents, actor_config.local_state_dim)
-        action_masks = torch.ones(batch_size, agent_config.num_agents, actor_config.action_dim)
-        joint_actions, log_probs, entropies, mean_entropy = agent.get_actions(local_obs, action_masks)
+        local_obs = torch.randn(
+            batch_size, agent_config.num_agents, actor_config.local_state_dim
+        )
+        action_masks = torch.ones(
+            batch_size, agent_config.num_agents, actor_config.action_dim
+        )
+        joint_actions, log_probs, entropies, mean_entropy = agent.get_actions(
+            local_obs, action_masks
+        )
         global_state = torch.randn(batch_size, critic_config.global_state_dim)
         values = agent.get_centralized_value(global_state, joint_actions)
         assert values.shape == (batch_size,)
@@ -248,12 +280,18 @@ class TestMAPPOIntegration:
         T = 64
         batch = {
             "global_states": torch.randn(T, agent.critic_config.global_state_dim),
-            "local_observations": torch.randn(T, config.num_agents, agent.actor_config.local_state_dim),
-            "joint_actions": torch.randint(0, agent.critic_config.action_dim, (T, config.num_agents)),
+            "local_observations": torch.randn(
+                T, config.num_agents, agent.actor_config.local_state_dim
+            ),
+            "joint_actions": torch.randint(
+                0, agent.critic_config.action_dim, (T, config.num_agents)
+            ),
             "old_log_probs": torch.randn(T, config.num_agents),
             "advantages": torch.randn(T),
             "returns": torch.randn(T),
-            "action_masks": torch.ones(T, config.num_agents, agent.actor_config.action_dim),
+            "action_masks": torch.ones(
+                T, config.num_agents, agent.actor_config.action_dim
+            ),
         }
         metrics = agent.update(batch, n_epochs=3, batch_size=32)
         assert metrics["entropy"] > 0.01
@@ -267,8 +305,12 @@ def test_entropy_threshold():
     T = 64
     batch = {
         "global_states": torch.randn(T, agent.critic_config.global_state_dim),
-        "local_observations": torch.randn(T, config.num_agents, agent.actor_config.local_state_dim),
-        "joint_actions": torch.randint(0, agent.critic_config.action_dim, (T, config.num_agents)),
+        "local_observations": torch.randn(
+            T, config.num_agents, agent.actor_config.local_state_dim
+        ),
+        "joint_actions": torch.randint(
+            0, agent.critic_config.action_dim, (T, config.num_agents)
+        ),
         "old_log_probs": torch.randn(T, config.num_agents),
         "advantages": torch.randn(T),
         "returns": torch.randn(T),
@@ -286,8 +328,12 @@ def test_value_std_threshold():
     T = 64
     batch = {
         "global_states": torch.randn(T, agent.critic_config.global_state_dim),
-        "local_observations": torch.randn(T, config.num_agents, agent.actor_config.local_state_dim),
-        "joint_actions": torch.randint(0, agent.critic_config.action_dim, (T, config.num_agents)),
+        "local_observations": torch.randn(
+            T, config.num_agents, agent.actor_config.local_state_dim
+        ),
+        "joint_actions": torch.randint(
+            0, agent.critic_config.action_dim, (T, config.num_agents)
+        ),
         "old_log_probs": torch.randn(T, config.num_agents),
         "advantages": torch.randn(T),
         "returns": torch.randn(T),
@@ -296,6 +342,87 @@ def test_value_std_threshold():
     agent.update(batch, n_epochs=1, batch_size=32)
     health = agent.check_training_health()
     assert health.get("recent_value_std", 0) > config.value_std_threshold
+
+
+def test_gae_vectorized_equivalence():
+    """Verify vectorized GAE matches original within tolerance."""
+    import torch
+    from ai.mappo.mappo_agent import MAPPOAgent, MAPPOAgentConfig
+    from ai.mappo.centralized_critic import CentralizedCriticConfig
+    from ai.mappo.mappo_policy import MAPPOActorConfig
+
+    config = MAPPOAgentConfig(
+        num_agents=5,
+        actor_config=MAPPOActorConfig(
+            local_state_dim=2670,
+            action_dim=20,
+        ),
+        critic_config=CentralizedCriticConfig(
+            local_state_dim=2670,
+            num_agents=5,
+            global_state_dim=2670 * 5,
+            action_dim=20,
+        ),
+    )
+    agent = MAPPOAgent(config)
+
+    torch.manual_seed(42)
+    T = 200
+
+    # Test case 1: No dones (single episode)
+    values = torch.randn(T)
+    rewards = torch.randn(T)
+    dones = torch.zeros(T)
+    next_values = torch.randn(T)
+
+    adv_orig, ret_orig = agent._compute_gae_original(
+        values, rewards, dones, next_values
+    )
+    adv_vec, ret_vec = agent._compute_gae_vectorized(
+        values, rewards, dones, next_values
+    )
+
+    assert torch.allclose(adv_orig, adv_vec, atol=1e-5), (
+        f"No-dones max diff: {(adv_orig - adv_vec).abs().max()}"
+    )
+    assert torch.allclose(ret_orig, ret_vec, atol=1e-5), (
+        f"No-dones returns max diff: {(ret_orig - ret_vec).abs().max()}"
+    )
+
+    # Test case 2: With dones (multiple episodes)
+    dones = torch.zeros(T)
+    dones[50] = 1.0
+    dones[120] = 1.0
+
+    adv_orig, ret_orig = agent._compute_gae_original(
+        values, rewards, dones, next_values
+    )
+    adv_vec, ret_vec = agent._compute_gae_vectorized(
+        values, rewards, dones, next_values
+    )
+
+    assert torch.allclose(adv_orig, adv_vec, atol=1e-5), (
+        f"With-dones max diff: {(adv_orig - adv_vec).abs().max()}"
+    )
+    assert torch.allclose(ret_orig, ret_vec, atol=1e-5), (
+        f"With-dones returns max diff: {(ret_orig - ret_vec).abs().max()}"
+    )
+
+    # Test case 3: All dones (each step is episode end)
+    dones_all = torch.ones(T)
+
+    adv_orig, ret_orig = agent._compute_gae_original(
+        values, rewards, dones_all, next_values
+    )
+    adv_vec, ret_vec = agent._compute_gae_vectorized(
+        values, rewards, dones_all, next_values
+    )
+
+    assert torch.allclose(adv_orig, adv_vec, atol=1e-5), (
+        f"All-dones max diff: {(adv_orig - adv_vec).abs().max()}"
+    )
+
+    print("GAE equivalence test passed!")
 
 
 if __name__ == "__main__":
