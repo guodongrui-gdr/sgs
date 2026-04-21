@@ -62,10 +62,11 @@ class SGSPhase(IntEnum):
 @dataclass
 class SGSConfig:
     player_num: int = 5
-    max_rounds: int = 15
+    max_rounds: int = 80
     use_action_mask: bool = True
     use_shaping: bool = True
     other_player_policy: str = "rule"
+    reveal_all_identities: bool = False
 
     state_config: Optional[EncodingConfig] = None
     action_config: Optional[ActionConfig] = None
@@ -135,6 +136,10 @@ class SGSEnv(_BaseEnv):
         self._max_turn_steps: int = 100
         self._action_failures: int = 0
         self._max_action_failures: int = 10
+
+        # Profiling counters for call count analysis
+        self._prof_game_state_dict_calls: int = 0  # Calls per step
+        self._prof_step_number: int = 0  # Current profiling step
 
         self._winner: Optional[str] = None
 
@@ -541,6 +546,8 @@ class SGSEnv(_BaseEnv):
         from skills.base import set_current_env, clear_current_env
 
         self._total_steps += 1
+        self._prof_game_state_dict_calls = 0
+        self._prof_step_number += 1
 
         # CRITICAL FIX: Remove auto-resolution - RL must make skill decisions
         # Return skill decision observation when pending, let RL choose
@@ -603,6 +610,10 @@ class SGSEnv(_BaseEnv):
         if done:
             info["winner"] = self._winner
             info["player_identity"] = self.players[self.current_player_idx].identity
+
+        print(
+            f"[PROF] step {self._prof_step_number}: _get_game_state_dict calls = {self._prof_game_state_dict_calls}"
+        )
 
         clear_current_env()
         return obs, reward, done, truncated, info
@@ -914,7 +925,10 @@ class SGSEnv(_BaseEnv):
 
     def _check_done(self) -> bool:
         if self.engine.phase == GamePhase.GAME_OVER:
-            self._winner = self._determine_winner()
+            if self.engine._winner:
+                self._winner = self.engine._winner
+            else:
+                self._winner = self._determine_winner()
             return True
 
         if self.engine.round_num >= self.config.max_rounds:
@@ -923,7 +937,7 @@ class SGSEnv(_BaseEnv):
 
         return False
 
-    def _determine_winner(self) -> str:
+    def _determine_winner(self) -> Optional[str]:
         alive_identities = [p.identity for p in self.players if p.is_alive]
 
         if "主公" not in alive_identities:
@@ -946,29 +960,36 @@ class SGSEnv(_BaseEnv):
             if lord_alive and not rebel_alive:
                 return "主公"
             elif lord_alive and lord_team_count >= rebel_team_count:
-                return "主公"
+                return None
             else:
-                return "反贼"
+                return None
 
-        return "反贼"
+        return None
 
     def _calculate_reward(self) -> float:
         player = self.players[self.current_player_idx]
         total_reward = self._pending_rewards
         self._pending_rewards = 0.0
 
-        if self._winner:
-            final_reward = self.reward_system.get_reward(
-                event_type="game_over",
-                source_identity="",
-                target_identity="",
-                current_identity=player.identity,
-                context={
-                    "winner": self._winner,
-                    "survivors": [p for p in self.players if p.is_alive],
-                },
-            )
-            return total_reward + final_reward
+        if (
+            self.engine.phase == GamePhase.GAME_OVER
+            or self.engine.round_num >= self.config.max_rounds
+        ):
+            if self._winner:
+                final_reward = self.reward_system.get_reward(
+                    event_type="game_over",
+                    source_identity="",
+                    target_identity="",
+                    current_identity=player.identity,
+                    context={
+                        "winner": self._winner,
+                        "survivors": [p for p in self.players if p.is_alive],
+                    },
+                )
+                return total_reward + final_reward
+            else:
+                draw_penalty = getattr(self.config.reward_config, "draw_penalty", -20.0)
+                return total_reward + draw_penalty
 
         for i, p in enumerate(self.players):
             if i == self.current_player_idx:
@@ -1062,6 +1083,7 @@ class SGSEnv(_BaseEnv):
         return obs
 
     def _get_game_state_dict(self) -> Dict:
+        self._prof_game_state_dict_calls += 1
         if self.engine is None:
             return {"players": [], "phase": "waiting"}
 
@@ -1156,10 +1178,12 @@ class SGSEnv(_BaseEnv):
     def _handle_skill_decision(
         self, action: int
     ) -> Tuple[Dict, float, bool, bool, Dict]:
-        """处理技能决策的step"""
         request = self.skill_decision_context.active_request
         if request is None:
             obs = self._get_observation()
+            print(
+                f"[PROF] step {self._prof_step_number}: _get_game_state_dict calls = {self._prof_game_state_dict_calls}"
+            )
             return obs, 0.0, False, False, {"error": "No pending decision"}
 
         action = int(action)
@@ -1167,6 +1191,9 @@ class SGSEnv(_BaseEnv):
 
         if action < 0 or action >= len(mask) or mask[action] == 0:
             obs = self._get_observation()
+            print(
+                f"[PROF] step {self._prof_step_number}: _get_game_state_dict calls = {self._prof_game_state_dict_calls}"
+            )
             return obs, -0.1, False, False, {"error": "Invalid skill decision"}
 
         from ai.skill_decision import SkillDecisionType
@@ -1259,6 +1286,9 @@ class SGSEnv(_BaseEnv):
         info["skill_decision_complete"] = request.is_resolved
         info["skill_decision_reward"] = skill_reward
 
+        print(
+            f"[PROF] step {self._prof_step_number}: _get_game_state_dict calls = {self._prof_game_state_dict_calls}"
+        )
         return obs, skill_reward, False, False, info
 
     def _get_skill_decision_mask(self) -> np.ndarray:
