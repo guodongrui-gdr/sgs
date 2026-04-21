@@ -42,7 +42,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -51,6 +51,7 @@ import torch
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent
@@ -68,6 +69,8 @@ if TYPE_CHECKING:
 
 # Import for unpickling dynamics checkpoints
 from train.train_dynamics import DynamicsTrainingConfig
+from train.memo_check import OOMDetector, OOMConfig
+from ai.state_cache import GlobalStateCache
 
 
 class TrainingMode(Enum):
@@ -82,18 +85,25 @@ class MAPPOWorldModelConfig:
     """Configuration for MAPPO + World Model integration training"""
 
     # Training parameters
+    seed: Optional[int] = None  # Random seed for reproducibility
     steps_total: int = 100000
-    n_envs: int = 1
-    batch_size: int = 64
+    n_envs: int = 32
+    steps_per_rollout: int = 2048  # Steps collected before each update
+    batch_size: int = 256
     learning_rate: float = 3e-4
     n_epochs: int = 10
     gamma: float = 0.99
     gae_lambda: float = 0.95
 
+    # Memory safety (from Task 1)
+    max_safe_envs: int = 32
+
     # Feature flags
     use_world_model: bool = False  # Enable imagination-based training
     use_mappo: bool = True  # MAPPO vs IPPO mode
     use_team_rewards: bool = False  # Enable team reward allocation
+    reveal_all_identities: bool = False  # Reveal all identities for training
+    use_subprocess: str = "auto"  # "true", "false", or "auto" for VecEnv selection
 
     # Checkpoint and logging
     checkpoint_interval: int = 10000
@@ -129,6 +139,36 @@ class MAPPOWorldModelConfig:
     evidence_dir: str = ".sisyphus/evidence"
 
     device: Optional[str] = None  # "cuda", "cuda:0", "cpu", or None for auto
+
+
+def make_env(rank: int, config: MAPPOWorldModelConfig) -> Callable[[], "SGSEnv"]:
+    """
+    Create environment factory for vectorized environments.
+
+    Args:
+        rank: Process rank for multiprocessing (used for seed offset)
+        config: MAPPO training configuration
+
+    Returns:
+        Callable that creates SGSEnv instance
+    """
+    from ai.gym_wrapper import SGSConfig, SGSEnv
+
+    def _init():
+        sgs_config = SGSConfig(
+            player_num=config.num_agents,
+            max_rounds=80,
+            use_action_mask=True,
+            use_shaping=True,
+            other_player_policy="rule",
+            reveal_all_identities=config.reveal_all_identities,
+        )
+        env = SGSEnv(sgs_config)
+        if config.seed is not None:
+            env.reset(seed=config.seed + rank)
+        return env
+
+    return _init
 
 
 # === Component Loaders ===
@@ -375,6 +415,7 @@ class MAPPOWorldModelTrainer:
         )
         logger.info(f"  - World Model: {config.use_world_model}")
         logger.info(f"  - Team Rewards: {config.use_team_rewards}")
+        logger.info(f"  - Reveal All Identities: {config.reveal_all_identities}")
         logger.info(f"  - Total steps: {config.steps_total}")
 
         # Initialize components
@@ -382,6 +423,24 @@ class MAPPOWorldModelTrainer:
         self._init_world_model()
         self._init_team_rewards()
         self._init_coordination_tracker()
+
+        # Initialize OOM detector for memory monitoring
+        self.oom_detector = OOMDetector(
+            OOMConfig(
+                warn_threshold=0.85,
+                reduce_threshold=0.90,
+                critical_threshold=0.95,
+                min_batch_size=8,
+            )
+        )
+        logger.info("OOMDetector initialized for memory monitoring")
+
+        # Initialize state cache for encoding optimization
+        self.state_cache = GlobalStateCache(
+            maxsize=1000, state_encoder=self.state_encoder
+        )
+        self._low_hit_rate_warned = False
+        logger.info("State cache initialized for encoding optimization")
 
         # Training state
         self._step_count = 0
@@ -429,7 +488,13 @@ class MAPPOWorldModelTrainer:
             )
 
         self.agent = MAPPOAgent(agent_config).to(self.device)
-        self.state_encoder = StateEncoder()
+
+        from ai.state_encoder import EncodingConfig
+
+        encoding_config = EncodingConfig(
+            reveal_all_identities=self.config.reveal_all_identities
+        )
+        self.state_encoder = StateEncoder(encoding_config)
 
         # Load weights if checkpoint available
         if checkpoint:
@@ -539,17 +604,73 @@ class MAPPOWorldModelTrainer:
         self.coordination_tracker = CoordinationTracker(self.config)
 
     def _create_env(self) -> "SGSEnv":
-        """Create a single SGS environment"""
         from ai.gym_wrapper import SGSConfig, SGSEnv
 
         sgs_config = SGSConfig(
             player_num=self.config.num_agents,
-            max_rounds=15,
+            max_rounds=80,
             use_action_mask=True,
             use_shaping=True,
             other_player_policy="rule",
+            reveal_all_identities=self.config.reveal_all_identities,
         )
         return SGSEnv(sgs_config)
+
+    def _make_env(self, rank: int = 0) -> Callable[[], "SGSEnv"]:
+        """
+        Create environment factory for VecEnv.
+
+        Args:
+            rank: Process rank for multiprocessing (used for seeding)
+
+        Returns:
+            Function that creates SGSEnv environment
+        """
+
+        def _init() -> "SGSEnv":
+            return self._create_env()
+
+        return _init
+
+    def _create_vec_env(self, n_envs: int, use_subprocess: bool = True) -> Any:
+        """
+        Create vectorized environment for training.
+
+        Args:
+            n_envs: Number of parallel environments
+            use_subprocess: Use SubprocVecEnv (True) or DummyVecEnv (False)
+
+        Returns:
+            VecEnv instance (SubprocVecEnv or DummyVecEnv)
+        """
+        env_fns = [self._make_env(rank=i) for i in range(n_envs)]
+
+        if use_subprocess and n_envs > 1:
+            env = SubprocVecEnv(env_fns)
+        else:
+            env = DummyVecEnv(env_fns)
+
+        return env
+
+    def _is_vec_env(self, env: Any) -> bool:
+        """Check if env is a VecEnv."""
+        return hasattr(env, "num_envs")
+
+    def _get_env_attr(self, env: Any, attr: str, env_idx: Optional[int] = None) -> Any:
+        """Get attribute from env, **works for both single env and VecEnv**."""
+        if self._is_vec_env(env):
+            values = env.get_attr(attr)
+            return values[env_idx] if env_idx is not None else values
+        return getattr(env, attr)
+
+    def _call_env_method(
+        self, env: Any, method: str, *args, env_idx: Optional[int] = None, **kwargs
+    ) -> Any:
+        """Call method on env, **works for both single env and VecEnv**."""
+        if self._is_vec_env(env):
+            results = env.env_method(method, *args, indices=env_idx, **kwargs)
+            return results[0] if env_idx is not None else results
+        return getattr(env, method)(*args, **kwargs)
 
     def _get_global_state(self, env: "SGSEnv") -> np.ndarray:
         """Get global state for all agents"""
@@ -557,7 +678,7 @@ class MAPPOWorldModelTrainer:
 
         local_states = []
         for i in range(self.config.num_agents):
-            local_state = self.state_encoder.encode(game_state, i)
+            local_state = self.state_encoder.fast_encode(game_state, i)
             local_states.append(local_state)
 
         return np.concatenate(local_states)
@@ -570,31 +691,42 @@ class MAPPOWorldModelTrainer:
 
         game_state = env._get_game_state_dict()
 
-        for i in range(self.config.num_agents):
-            if i < len(env.players) and env.players[i].is_alive:
-                type_mask, card_mask, target_mask = (
-                    env.action_mask_generator.generate_masks(
-                        game_state, env.players[i], env.engine, 0, None
-                    )
+        # Pre-filter alive agents to avoid wasted checks on dead agents
+        alive_indices = [
+            i
+            for i in range(self.config.num_agents)
+            if i < len(env.players) and env.players[i].is_alive
+        ]
+
+        for i in alive_indices:
+            type_mask, card_mask, target_mask = (
+                env.action_mask_generator.generate_masks(
+                    game_state, env.players[i], env.engine, 0, None
                 )
-                combined_mask = np.concatenate([type_mask, card_mask, target_mask])
-                if len(combined_mask) < self.config.action_dim:
-                    combined_mask = np.pad(
-                        combined_mask, (0, self.config.action_dim - len(combined_mask))
-                    )
-                masks[i] = combined_mask[: self.config.action_dim]
+            )
+            combined_mask = np.concatenate([type_mask, card_mask, target_mask])
+            if len(combined_mask) < self.config.action_dim:
+                combined_mask = np.pad(
+                    combined_mask, (0, self.config.action_dim - len(combined_mask))
+                )
+            masks[i] = combined_mask[: self.config.action_dim]
 
         return masks
 
-    def _collect_real_rollout(
-        self, env: "SGSEnv", n_steps: int
-    ) -> Dict[str, torch.Tensor]:
-        """Collect rollout from real environment"""
-        obs, info = env.reset()
+    def _collect_real_rollout(self, env: Any, n_steps: int) -> Dict[str, torch.Tensor]:
+        """Collect rollout from real environment (single or VecEnv)"""
+        is_vec = self._is_vec_env(env)
+        n_envs = env.num_envs if is_vec else 1
 
-        # Initialize team reward allocator if enabled
-        if self.team_reward_allocator and hasattr(env, "players"):
-            self.team_reward_allocator.initialize_teams(env.players)
+        obs = env.reset()
+        if is_vec:
+            infos = [{} for _ in range(n_envs)]
+        else:
+            infos = {}
+
+        if self.team_reward_allocator and not is_vec:
+            players = self._get_env_attr(env, "players")
+            self.team_reward_allocator.initialize_teams(players)
 
         global_states = []
         local_observations = []
@@ -605,127 +737,282 @@ class MAPPOWorldModelTrainer:
         action_masks = []
         values = []
 
-        team_rewards_episode = {"lord_team": 0.0, "rebel_team": 0.0}
+        team_rewards_episodes = [
+            {"lord_team": 0.0, "rebel_team": 0.0} for _ in range(n_envs)
+        ]
+        episode_lengths = [0 for _ in range(n_envs)]
 
         for step in range(n_steps):
-            global_state = self._get_global_state(env)
-            local_obs = np.zeros(
-                (self.config.num_agents, self.config.local_state_dim), dtype=np.float32
-            )
+            if is_vec:
+                game_states = env.env_method("_get_game_state_dict")
+                current_player_indices = env.get_attr("current_player_idx")
+                all_players = env.get_attr("players")
+            else:
+                game_states = [env._get_game_state_dict()]
+                current_player_indices = [env.current_player_idx]
+                all_players = [env.players]
 
-            game_state = env._get_game_state_dict()
-            for i in range(self.config.num_agents):
-                local_obs[i] = self.state_encoder.encode(game_state, i)
+            batch_global_states = []
+            batch_local_obs = []
+            batch_masks = []
 
-            masks = self._get_action_masks(env)
+            for env_idx in range(n_envs):
+                game_state = game_states[env_idx]
+                players = all_players[env_idx]
+                current_player_idx = current_player_indices[env_idx]
+
+                local_obs = np.zeros(
+                    (self.config.num_agents, self.config.local_state_dim),
+                    dtype=np.float32,
+                )
+                masks = np.zeros(
+                    (self.config.num_agents, self.config.action_dim), dtype=np.float32
+                )
+
+                if is_vec:
+                    action_mask_generators = env.get_attr("action_mask_generator")
+                    engines = env.get_attr("engine")
+                    action_mask_gen = action_mask_generators[env_idx]
+                    engine = engines[env_idx]
+                else:
+                    action_mask_gen = env.action_mask_generator
+                    engine = env.engine
+
+                if (
+                    current_player_idx < len(players)
+                    and players[current_player_idx].is_alive
+                ):
+                    local_obs[current_player_idx] = self.state_encoder.fast_encode(
+                        game_state, current_player_idx
+                    )
+                    type_mask, card_mask, target_mask = action_mask_gen.generate_masks(
+                        game_state, players[current_player_idx], engine, 0, None
+                    )
+                    combined_mask = np.concatenate([type_mask, card_mask, target_mask])
+                    if len(combined_mask) < self.config.action_dim:
+                        combined_mask = np.pad(
+                            combined_mask,
+                            (0, self.config.action_dim - len(combined_mask)),
+                        )
+                    masks[current_player_idx] = combined_mask[: self.config.action_dim]
+
+                global_state = local_obs.flatten()
+
+                batch_global_states.append(global_state)
+                batch_local_obs.append(local_obs)
+                batch_masks.append(masks)
+
+            global_state_batch = np.stack(batch_global_states)
+            local_obs_batch = np.stack(batch_local_obs)
+            masks_batch = np.stack(batch_masks)
 
             global_state_t = (
-                torch.from_numpy(global_state).unsqueeze(0).float().to(self.device)
+                torch.from_numpy(global_state_batch)
+                .float()
+                .to(self.device, non_blocking=True)
             )
             local_obs_t = (
-                torch.from_numpy(local_obs).unsqueeze(0).float().to(self.device)
+                torch.from_numpy(local_obs_batch)
+                .float()
+                .to(self.device, non_blocking=True)
             )
-            masks_t = torch.from_numpy(masks).unsqueeze(0).float().to(self.device)
+            masks_t = (
+                torch.from_numpy(masks_batch).float().to(self.device, non_blocking=True)
+            )
+
+            actions_np = np.zeros((n_envs, self.config.num_agents), dtype=np.int64)
+            log_probs_np = np.zeros((n_envs, self.config.num_agents), dtype=np.float32)
+            entropies_sum = 0.0
+            valid_agent_count = 0
 
             with torch.no_grad():
-                joint_action_t, log_probs_t, entropies_t, mean_entropy = (
-                    self.agent.get_actions(local_obs_t, masks_t, deterministic=False)
-                )
+                for env_idx in range(n_envs):
+                    current_player_idx = current_player_indices[env_idx]
+                    players = all_players[env_idx]
+                    if (
+                        current_player_idx < len(players)
+                        and players[current_player_idx].is_alive
+                    ):
+                        obs_single = local_obs_t[env_idx, current_player_idx].unsqueeze(
+                            0
+                        )
+                        mask_single = masks_t[env_idx, current_player_idx].unsqueeze(0)
+                        action, log_prob, entropy = self.agent.actors[
+                            current_player_idx
+                        ].get_action(obs_single, mask_single, deterministic=False)
+                        actions_np[env_idx, current_player_idx] = action.item()
+                        log_probs_np[env_idx, current_player_idx] = log_prob.item()
+                        entropies_sum += entropy.item()
+                        valid_agent_count += 1
+
+                mean_entropy = entropies_sum / max(valid_agent_count, 1)
 
                 value_t = self.agent.get_centralized_value(
-                    global_state_t, joint_action_t
+                    global_state_t, torch.from_numpy(actions_np).long().to(self.device)
                 )
 
-            actions_np = joint_action_t.squeeze(0).cpu().numpy()
+            values_np = value_t.cpu().numpy().flatten()
 
-            current_player_idx = env.current_player_idx
-            episode_reward = 0.0
+            if is_vec:
+                actions_for_step = np.zeros(n_envs, dtype=np.int64)
+                for env_idx in range(n_envs):
+                    current_player_idx = current_player_indices[env_idx]
+                    players = all_players[env_idx]
+                    if (
+                        current_player_idx < len(players)
+                        and players[current_player_idx].is_alive
+                    ):
+                        actions_for_step[env_idx] = int(
+                            actions_np[env_idx, current_player_idx]
+                        )
+                    else:
+                        actions_for_step[env_idx] = 0
 
-            if (
-                current_player_idx < len(env.players)
-                and env.players[current_player_idx].is_alive
-            ):
-                action_type = int(actions_np[current_player_idx])
                 try:
-                    step_result = env.step(action_type)
-                    obs, reward, terminated, truncated, info = step_result
-                    done = terminated or truncated
-                    episode_reward = reward
-
-                    # Track coordination if team rewards enabled
-                    if self.team_reward_allocator and self.config.use_team_rewards:
-                        self._track_coordination(
-                            env, current_player_idx, action_type, info
-                        )
-                        team_rewards_episode["lord_team"] += info.get(
-                            "lord_team_reward", 0.0
-                        )
-                        team_rewards_episode["rebel_team"] += info.get(
-                            "rebel_team_reward", 0.0
-                        )
-
+                    obs, step_rewards, terminateds, truncateds, step_infos = env.step(
+                        actions_for_step
+                    )
+                    step_dones = terminateds | truncateds
                 except Exception as e:
-                    logger.warning(f"Action failed: {e}")
-                    obs, info = env.reset()
-                    done = True
-                    episode_reward = 0.0
+                    logger.warning(f"VecEnv step failed: {e}")
+                    obs = env.reset()
+                    step_rewards = np.zeros(n_envs)
+                    step_dones = np.ones(n_envs, dtype=bool)
+                    step_infos = [{} for _ in range(n_envs)]
             else:
-                obs, info = env.reset()
-                done = True
+                current_player_idx = current_player_indices[0]
+                players = all_players[0]
                 episode_reward = 0.0
+                step_done = False
+                step_info = {}
 
-            global_states.append(global_state)
-            local_observations.append(local_obs)
-            joint_actions.append(actions_np)
-            old_log_probs.append(log_probs_t.squeeze(0).cpu().numpy())
-            rewards.append(episode_reward)
-            dones.append(done)
-            action_masks.append(masks)
-            values.append(value_t.item())
+                if (
+                    current_player_idx < len(players)
+                    and players[current_player_idx].is_alive
+                ):
+                    action_type = int(actions_np[0, current_player_idx])
+                    try:
+                        step_result = env.step(action_type)
+                        obs, episode_reward, terminated, truncated, step_info = (
+                            step_result
+                        )
+                        step_done = terminated or truncated
 
-            self._entropy_history.append(mean_entropy.item())
+                        if self.team_reward_allocator and self.config.use_team_rewards:
+                            self._track_coordination(
+                                env, current_player_idx, action_type, step_info
+                            )
+                            team_rewards_episodes[0]["lord_team"] += step_info.get(
+                                "lord_team_reward", 0.0
+                            )
+                            team_rewards_episodes[0]["rebel_team"] += step_info.get(
+                                "rebel_team_reward", 0.0
+                            )
+                    except Exception as e:
+                        logger.warning(f"Action failed: {e}")
+                        obs = env.reset()
+                        step_done = True
+                        episode_reward = 0.0
+                else:
+                    obs = env.reset()
+                    step_done = True
+                    episode_reward = 0.0
 
-            if done:
-                # Record episode result
-                winner = info.get("winner") if isinstance(info, dict) else None
-                self.coordination_tracker.record_episode_result(
-                    winner=winner,
-                    episode_length=step + 1,
-                    team_rewards=team_rewards_episode,
-                )
-                team_rewards_episode = {"lord_team": 0.0, "rebel_team": 0.0}
+                step_rewards = np.array([episode_reward])
+                step_dones = np.array([step_done])
+                step_infos = [step_info]
 
-                obs, info = env.reset()
-                self._episode_count += 1
+            for env_idx in range(n_envs):
+                global_states.append(batch_global_states[env_idx])
+                local_observations.append(batch_local_obs[env_idx])
+                joint_actions.append(actions_np[env_idx])
+                old_log_probs.append(log_probs_np[env_idx])
+                rewards.append(step_rewards[env_idx])
+                dones.append(step_dones[env_idx])
+                action_masks.append(batch_masks[env_idx])
+                values.append(values_np[env_idx])
 
-                # Reinitialize team reward allocator
-                if self.team_reward_allocator and hasattr(env, "players"):
-                    self.team_reward_allocator.initialize_teams(env.players)
+                episode_lengths[env_idx] += 1
 
-        # Convert to tensors
+                if step_dones[env_idx]:
+                    winner = (
+                        step_infos[env_idx].get("winner")
+                        if isinstance(step_infos[env_idx], dict)
+                        else None
+                    )
+                    self.coordination_tracker.record_episode_result(
+                        winner=winner,
+                        episode_length=episode_lengths[env_idx],
+                        team_rewards=team_rewards_episodes[env_idx],
+                    )
+                    team_rewards_episodes[env_idx] = {
+                        "lord_team": 0.0,
+                        "rebel_team": 0.0,
+                    }
+                    episode_lengths[env_idx] = 0
+                    self._episode_count += 1
+
+            self._entropy_history.append(mean_entropy)
+
+            if step % 100 == 0:
+                hit_rate = self.state_cache.get_hit_rate()
+                logger.debug(f"[Step {step}] Cache hit rate: {hit_rate:.2%}")
+
         global_states_t = (
-            torch.from_numpy(np.array(global_states)).float().to(self.device)
+            torch.from_numpy(np.array(global_states))
+            .float()
+            .to(self.device, non_blocking=True)
         )
         local_observations_t = (
-            torch.from_numpy(np.array(local_observations)).float().to(self.device)
+            torch.from_numpy(np.array(local_observations))
+            .float()
+            .to(self.device, non_blocking=True)
         )
         joint_actions_t = (
-            torch.from_numpy(np.array(joint_actions)).long().to(self.device)
+            torch.from_numpy(np.array(joint_actions))
+            .long()
+            .to(self.device, non_blocking=True)
         )
         old_log_probs_t = (
-            torch.from_numpy(np.array(old_log_probs)).float().to(self.device)
+            torch.from_numpy(np.array(old_log_probs))
+            .float()
+            .to(self.device, non_blocking=True)
         )
-        rewards_t = torch.from_numpy(np.array(rewards)).float().to(self.device)
-        dones_t = torch.from_numpy(np.array(dones)).float().to(self.device)
+        rewards_t = (
+            torch.from_numpy(np.array(rewards))
+            .float()
+            .to(self.device, non_blocking=True)
+        )
+        dones_t = (
+            torch.from_numpy(np.array(dones)).float().to(self.device, non_blocking=True)
+        )
         action_masks_t = (
-            torch.from_numpy(np.array(action_masks)).float().to(self.device)
+            torch.from_numpy(np.array(action_masks))
+            .float()
+            .to(self.device, non_blocking=True)
         )
-        values_t = torch.from_numpy(np.array(values)).float().to(self.device)
+        values_t = (
+            torch.from_numpy(np.array(values))
+            .float()
+            .to(self.device, non_blocking=True)
+        )
 
-        # Compute advantages
-        next_global_state = self._get_global_state(env)
+        if is_vec:
+            game_states = env.env_method("_get_game_state_dict")
+            next_global_state = np.concatenate(
+                [
+                    self.state_encoder.fast_encode(game_states[0], i)
+                    for i in range(self.config.num_agents)
+                ]
+            )
+        else:
+            next_global_state = self._get_global_state(env)
+
         next_global_state_t = (
-            torch.from_numpy(next_global_state).unsqueeze(0).float().to(self.device)
+            torch.from_numpy(next_global_state)
+            .unsqueeze(0)
+            .float()
+            .to(self.device, non_blocking=True)
         )
 
         with torch.no_grad():
@@ -739,16 +1026,26 @@ class MAPPOWorldModelTrainer:
         next_values = np.zeros(len(rewards))
         for i in range(len(rewards)):
             if dones[i]:
-                next_values[i] = 0
+                next_values[i] = values[i]
             elif i == len(rewards) - 1:
                 next_values[i] = next_value
             else:
                 next_values[i] = values[i + 1]
 
-        next_values_t = torch.from_numpy(next_values).float().to(self.device)
+        next_values_t = (
+            torch.from_numpy(next_values).float().to(self.device, non_blocking=True)
+        )
 
         advantages, returns = self.agent.compute_gae(
             values_t, rewards_t, dones_t, next_values_t
+        )
+
+        cache_stats = self.state_cache.get_stats()
+        hit_rate = self.state_cache.get_hit_rate()
+        logger.debug(
+            f"State cache: hit_rate={hit_rate:.2%}, "
+            f"hits={cache_stats['hits']}, misses={cache_stats['misses']}, "
+            f"size={cache_stats['size']}/{cache_stats['maxsize']}"
         )
 
         return {
@@ -785,7 +1082,7 @@ class MAPPOWorldModelTrainer:
                 z_0.unsqueeze(0)
                 .expand(1, self.config.num_agents, -1)
                 .float()
-                .to(self.device)
+                .to(self.device, non_blocking=True)
             )
 
             # Generate action masks from imagination state
@@ -797,14 +1094,14 @@ class MAPPOWorldModelTrainer:
                     .unsqueeze(0)
                     .unsqueeze(0)
                     .float()
-                    .to(self.device)
+                    .to(self.device, non_blocking=True)
                 )
                 masks_t = masks_t.expand(1, self.config.num_agents, -1)
             else:
                 masks_t = (
                     torch.ones(1, self.config.num_agents, self.config.action_dim)
                     .float()
-                    .to(self.device)
+                    .to(self.device, non_blocking=True)
                 )
 
             with torch.no_grad():
@@ -834,10 +1131,14 @@ class MAPPOWorldModelTrainer:
             return {}
 
         # Convert to tensors
-        z_sequence_t = torch.stack(z_sequence, dim=0).squeeze(1).to(self.device)
-        rewards_t = torch.tensor(rewards_sequence, dtype=torch.float32).to(self.device)
+        z_sequence_t = (
+            torch.stack(z_sequence, dim=0).squeeze(1).to(self.device, non_blocking=True)
+        )
+        rewards_t = torch.tensor(rewards_sequence, dtype=torch.float32).to(
+            self.device, non_blocking=True
+        )
         uncertainties_t = torch.tensor(uncertainties_sequence, dtype=torch.float32).to(
-            self.device
+            self.device, non_blocking=True
         )
 
         return {
@@ -932,7 +1233,7 @@ class MAPPOWorldModelTrainer:
         if self.team_reward_allocator:
             self.team_reward_allocator.initialize_teams(eval_env.players)
 
-        while not done and episode_steps < 500:
+        while not done and episode_steps < 5000:
             game_state = eval_env._get_game_state_dict()
 
             local_obs = np.zeros(
@@ -943,29 +1244,43 @@ class MAPPOWorldModelTrainer:
                 (self.config.num_agents, self.config.action_dim), dtype=np.float32
             )
 
-            for i in range(self.config.num_agents):
-                if i < len(eval_env.players) and eval_env.players[i].is_alive:
-                    local_obs[i] = self.state_encoder.encode(game_state, i)
-                    type_mask, card_mask, target_mask = (
-                        eval_env.action_mask_generator.generate_masks(
-                            game_state,
-                            eval_env.players[i],
-                            eval_env.engine,
-                            0,
-                            None,
-                        )
+            # Pre-filter alive agents to avoid wasted checks on dead agents
+            alive_indices = [
+                i
+                for i in range(self.config.num_agents)
+                if i < len(eval_env.players) and eval_env.players[i].is_alive
+            ]
+
+            for i in alive_indices:
+                local_obs[i] = self.state_encoder.fast_encode(game_state, i)
+                type_mask, card_mask, target_mask = (
+                    eval_env.action_mask_generator.generate_masks(
+                        game_state,
+                        eval_env.players[i],
+                        eval_env.engine,
+                        0,
+                        None,
                     )
-                    combined = np.concatenate([type_mask, card_mask, target_mask])
-                    if len(combined) < self.config.action_dim:
-                        combined = np.pad(
-                            combined, (0, self.config.action_dim - len(combined))
-                        )
-                    masks[i] = combined[: self.config.action_dim]
+                )
+                combined = np.concatenate([type_mask, card_mask, target_mask])
+                if len(combined) < self.config.action_dim:
+                    combined = np.pad(
+                        combined, (0, self.config.action_dim - len(combined))
+                    )
+                masks[i] = combined[: self.config.action_dim]
 
             local_obs_t = (
-                torch.from_numpy(local_obs).unsqueeze(0).float().to(self.device)
+                torch.from_numpy(local_obs)
+                .unsqueeze(0)
+                .float()
+                .to(self.device, non_blocking=True)
             )
-            masks_t = torch.from_numpy(masks).unsqueeze(0).float().to(self.device)
+            masks_t = (
+                torch.from_numpy(masks)
+                .unsqueeze(0)
+                .float()
+                .to(self.device, non_blocking=True)
+            )
 
             with torch.no_grad():
                 joint_action_t, _, _, _ = self.agent.get_actions(
@@ -1046,7 +1361,15 @@ class MAPPOWorldModelTrainer:
 
     def train(self, log_dir: Optional[str] = None) -> Dict[str, float]:
         """Main training loop"""
-        env = self._create_env()
+        # Resolve "auto" to actual boolean
+        if self.config.use_subprocess == "auto":
+            use_subprocess = self.config.n_envs > 1
+        elif self.config.use_subprocess == "true":
+            use_subprocess = True
+        else:
+            use_subprocess = False
+        env = self._create_vec_env(self.config.n_envs, use_subprocess=use_subprocess)
+        n_envs = self.config.n_envs
 
         # Suppress verbose engine logs
         logging.getLogger("engine").setLevel(logging.ERROR)
@@ -1072,20 +1395,33 @@ class MAPPOWorldModelTrainer:
         logger.info(f"TensorBoard logs: {output_dir}")
 
         # Training parameters
-        steps_per_rollout = 64
+        steps_per_rollout = self.config.steps_per_rollout
         start_time = time.time()
         pbar = tqdm(total=self.config.steps_total, desc="Training", unit="steps")
 
         while self._step_count < self.config.steps_total:
+            # Memory check before rollout
+            mem_result = self.oom_detector.check()
+            if mem_result.get("should_warn", False):
+                self.oom_detector.log_warning()
+            if mem_result.get("should_reduce", False):
+                new_batch = self.oom_detector.reduce_batch(self.config.batch_size)
+                if new_batch < self.config.batch_size:
+                    self.config.batch_size = new_batch
+                    pbar.write(f"[OOM] Reduced batch_size to {new_batch}")
+
             # Real environment rollout
             real_rollout = self._collect_real_rollout(env, steps_per_rollout)
 
             # Imagination rollout if enabled
             imagination_rollout = {}
             if self.config.use_world_model and self.imagination_env:
-                # Get current state for imagination
-                game_state = env._get_game_state_dict()
-                current_state = self.state_encoder.encode(game_state, 0)
+                if self._is_vec_env(env):
+                    game_states = env.env_method("_get_game_state_dict")
+                    game_state = game_states[0]
+                else:
+                    game_state = env._get_game_state_dict()
+                current_state = self.state_encoder.fast_encode(game_state, 0)
 
                 imagination_rollout = self._collect_imagination_rollout(
                     current_state,
@@ -1143,6 +1479,11 @@ class MAPPOWorldModelTrainer:
                 )
                 self._writer.add_scalar(
                     "train/episodes", self._episode_count, self._step_count
+                )
+                self._writer.add_scalar(
+                    "train/gpu_memory_usage",
+                    mem_result.get("utilization", 0.0),
+                    self._step_count,
                 )
 
                 # Coordination metrics
@@ -1372,14 +1713,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--n-envs",
         type=int,
-        default=1,
-        help="Number of parallel environments (default: 1)",
+        default=32,
+        help="Number of parallel environments. More envs = faster training but more memory. (default: 32, max: 32)",
     )
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=64,
-        help="Batch size for training (default: 64)",
+        default=256,
+        help="Batch size for training (default: 256)",
+    )
+    parser.add_argument(
+        "--steps-per-rollout",
+        type=int,
+        default=2048,
+        help="Steps collected before each update (default: 2048)",
     )
     parser.add_argument(
         "--lr", type=float, default=3e-4, help="Learning rate (default: 3e-4)"
@@ -1406,6 +1753,20 @@ def parse_args() -> argparse.Namespace:
         default="false",
         choices=["true", "false"],
         help="Enable team reward allocation (default: false)",
+    )
+    parser.add_argument(
+        "--reveal-all-identities",
+        type=str,
+        default="false",
+        choices=["true", "false"],
+        help="Reveal all identities to AI for training (default: false)",
+    )
+    parser.add_argument(
+        "--use-subprocess",
+        type=str,
+        default="auto",
+        choices=["true", "false", "auto"],
+        help="Use SubprocVecEnv (true) or DummyVecEnv (false) or auto-select based on n_envs (default: auto)",
     )
 
     # Checkpoint paths
@@ -1463,16 +1824,21 @@ def main():
     use_world_model = args.use_world_model.lower() == "true"
     use_mappo = args.use_mappo.lower() == "true"
     use_team_rewards = args.use_team_rewards.lower() == "true"
+    reveal_all_identities = args.reveal_all_identities.lower() == "true"
+    use_subprocess = args.use_subprocess.lower()
 
     # Create configuration
     config = MAPPOWorldModelConfig(
         steps_total=args.steps,
         n_envs=args.n_envs,
+        steps_per_rollout=args.steps_per_rollout,
         batch_size=args.batch_size,
         learning_rate=args.lr,
         use_world_model=use_world_model,
         use_mappo=use_mappo,
         use_team_rewards=use_team_rewards,
+        reveal_all_identities=reveal_all_identities,
+        use_subprocess=use_subprocess,
         mappo_checkpoint_path=args.mappo_checkpoint,
         dynamics_checkpoint_path=args.dynamics_checkpoint,
         output_dir=args.output_dir,

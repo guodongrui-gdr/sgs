@@ -19,9 +19,39 @@ from typing import Dict, List, Optional, Tuple
 import torch
 import torch.nn as nn
 import numpy as np
+from torch.cuda.amp import GradScaler
 
 from .centralized_critic import CentralizedCritic, CentralizedCriticConfig
 from .mappo_policy import MAPPOActor, MAPPOActorConfig
+
+
+class RunningMeanStd:
+    """Running mean and standard deviation for reward normalization"""
+
+    def __init__(self, epsilon: float = 1e-8):
+        self.mean = 0.0
+        self.var = 1.0
+        self.count = epsilon
+        self.epsilon = epsilon
+
+    def update(self, x: np.ndarray):
+        batch_mean = np.mean(x)
+        batch_var = np.var(x)
+        batch_count = len(x)
+        self._update_from_moments(batch_mean, batch_var, batch_count)
+
+    def _update_from_moments(self, batch_mean, batch_var, batch_count):
+        delta = batch_mean - self.mean
+        total_count = self.count + batch_count
+        self.mean = self.mean + delta * batch_count / total_count
+        m_a = self.var * self.count
+        m_b = batch_var * batch_count
+        M2 = m_a + m_b + np.square(delta) * self.count * batch_count / total_count
+        self.var = M2 / total_count
+        self.count = total_count
+
+    def normalize(self, x: np.ndarray) -> np.ndarray:
+        return (x - self.mean) / np.sqrt(self.var + self.epsilon)
 
 
 @dataclass
@@ -40,6 +70,7 @@ class MAPPOAgentConfig:
     ppo_gae_lambda: float = 0.95
 
     learning_rate: float = 3e-4
+    learning_rate_decay: float = 0.9995
     max_grad_norm: float = 0.5
 
     entropy_threshold: float = 0.01
@@ -77,8 +108,12 @@ class MAPPOAgent(nn.Module):
             lr=c.learning_rate,
         )
 
+        self.reward_normalizer = RunningMeanStd()
+        self._update_count = 0
+
         self._entropy_history: List[float] = []
         self._value_std_history: List[float] = []
+        self.scaler = GradScaler() if torch.cuda.is_available() else None
 
     def get_actions(
         self,
@@ -148,7 +183,7 @@ class MAPPOAgent(nn.Module):
         """
         return self.shared_critic(global_state, joint_actions, is_alive_mask)
 
-    def compute_gae(
+    def _compute_gae_original(
         self,
         values: torch.Tensor,
         rewards: torch.Tensor,
@@ -156,7 +191,7 @@ class MAPPOAgent(nn.Module):
         next_values: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Compute Generalized Advantage Estimation
+        Compute Generalized Advantage Estimation (original loop-based implementation)
 
         Args:
             values: (T,) - value estimates
@@ -187,6 +222,66 @@ class MAPPOAgent(nn.Module):
         returns = advantages + values
 
         return advantages, returns
+
+    def _compute_gae_vectorized(
+        self,
+        values: torch.Tensor,
+        rewards: torch.Tensor,
+        dones: torch.Tensor,
+        next_values: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Vectorized GAE using cumulative sum with episode segmentation."""
+        gamma = self.config.ppo_gamma
+        gae_lambda = self.config.ppo_gae_lambda
+        discount = gamma * gae_lambda
+        T = len(rewards)
+
+        # TD residuals with done masking
+        next_values_masked = next_values * (1 - dones)
+        deltas = rewards + gamma * next_values_masked - values
+
+        # Work in reverse order
+        reversed_deltas = torch.flip(deltas, [0])
+        reversed_dones = torch.flip(dones, [0])
+
+        # Build decay factors that reset at episode boundaries
+        # When done=1, next GAE should be 0, so decay factor should be 0
+        decay_factors = (1 - reversed_dones) * discount
+
+        # Compute cumulative GAE in reverse
+        reversed_advantages = torch.zeros_like(rewards)
+        gae = 0.0
+        for t in range(T):
+            gae = reversed_deltas[t] + decay_factors[t] * gae
+            reversed_advantages[t] = gae
+
+        advantages = torch.flip(reversed_advantages, [0])
+
+        # Returns
+        returns = advantages + values
+        return advantages, returns
+
+    def compute_gae(
+        self,
+        values: torch.Tensor,
+        rewards: torch.Tensor,
+        dones: torch.Tensor,
+        next_values: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Compute Generalized Advantage Estimation
+
+        Args:
+            values: (T,) - value estimates
+            rewards: (T,) - rewards received
+            dones: (T,) - episode termination flags
+            next_values: (T,) - next value estimates
+
+        Returns:
+            advantages: (T,)
+            returns: (T,)
+        """
+        return self._compute_gae_vectorized(values, rewards, dones, next_values)
 
     def update(
         self,
@@ -365,6 +460,15 @@ class MAPPOAgent(nn.Module):
         self._value_std_history.append(
             self.shared_critic.get_value_std(global_states[:1])
         )
+
+        self._update_count += 1
+        if self._update_count % 100 == 0:
+            new_lr = self.config.learning_rate * (
+                self.config.learning_rate_decay**self._update_count
+            )
+            for param_group in self.optimizer.param_groups:
+                param_group["lr"] = new_lr
+            metrics["learning_rate"] = new_lr
 
         return metrics
 

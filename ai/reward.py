@@ -366,6 +366,11 @@ class RewardConfig:
     protect_lord_reward: float = 2.0  # 保护主公
     assist_ally_reward: float = 1.0  # 协助队友
 
+    # Phase 3 新增: 平局惩罚和身份特定奖励
+    draw_penalty: float = -20.0  # 平局惩罚 (避免100%平局)
+    rebel_damage_lord_bonus: float = 5.0  # 反贼伤害主公额外奖励
+    spy_balance_bonus: float = 2.0  # 内奸维持局势平衡奖励
+
     # Reward clipping
     clip_reward: float = 50.0  # Phase 2: Adjusted
 

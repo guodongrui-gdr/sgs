@@ -38,6 +38,8 @@ class EncodingConfig:
     num_armours: int = 7
     num_action_types: int = 10
 
+    reveal_all_identities: bool = False
+
 
 class CardNameEncoder:
     """卡牌名称编码器"""
@@ -98,13 +100,24 @@ class CardNameEncoder:
 
     def __init__(self):
         self.name_to_idx = {name: i for i, name in enumerate(self.CARD_NAMES)}
+        # Pre-compute all one-hot vectors
+        self._one_hot_cache = {}
+        for name, idx in self.name_to_idx.items():
+            vec = np.zeros(len(self.CARD_NAMES), dtype=np.float32)
+            vec[idx] = 1.0
+            self._one_hot_cache[name] = vec
+        # Cache the zero vector for unknown
+        self._zero_vector = np.zeros(len(self.CARD_NAMES), dtype=np.float32)
 
     def encode(self, card_name: str) -> np.ndarray:
         """将卡牌名称编码为one-hot向量"""
-        encoding = np.zeros(len(self.CARD_NAMES), dtype=np.float32)
-        if card_name in self.name_to_idx:
-            encoding[self.name_to_idx[card_name]] = 1.0
-        return encoding
+        return self._one_hot_cache.get(card_name, self._zero_vector).copy()
+
+    def encode_into(self, card_name: str, buf: np.ndarray, offset: int) -> int:
+        """Encode card name directly into buffer without allocation."""
+        cached = self._one_hot_cache.get(card_name, self._zero_vector)
+        buf[offset : offset + len(cached)] = cached
+        return offset + len(cached)
 
     def get_num_cards(self) -> int:
         return len(self.CARD_NAMES)
@@ -132,13 +145,24 @@ class CardTypeEncoder:
 
     def __init__(self):
         self.type_to_idx = {t: i for i, t in enumerate(self.CARD_TYPES)}
+        # Pre-compute all one-hot vectors
+        self._one_hot_cache = {}
+        for t, idx in self.type_to_idx.items():
+            vec = np.zeros(len(self.CARD_TYPES), dtype=np.float32)
+            vec[idx] = 1.0
+            self._one_hot_cache[t] = vec
+        # Cache the zero vector for unknown
+        self._zero_vector = np.zeros(len(self.CARD_TYPES), dtype=np.float32)
 
     def encode(self, card_type: str) -> np.ndarray:
         """将卡牌类型编码为one-hot向量"""
-        encoding = np.zeros(len(self.CARD_TYPES), dtype=np.float32)
-        if card_type in self.type_to_idx:
-            encoding[self.type_to_idx[card_type]] = 1.0
-        return encoding
+        return self._one_hot_cache.get(card_type, self._zero_vector).copy()
+
+    def encode_into(self, card_type: str, buf: np.ndarray, offset: int) -> int:
+        """Encode card type directly into buffer without allocation."""
+        cached = self._one_hot_cache.get(card_type, self._zero_vector)
+        buf[offset : offset + len(cached)] = cached
+        return offset + len(cached)
 
 
 class CommanderEncoder:
@@ -178,12 +202,23 @@ class CommanderEncoder:
 
     def __init__(self):
         self.name_to_idx = {name: i for i, name in enumerate(self.COMMANDERS)}
+        # Pre-compute all one-hot vectors
+        self._one_hot_cache = {}
+        for name, idx in self.name_to_idx.items():
+            vec = np.zeros(len(self.COMMANDERS), dtype=np.float32)
+            vec[idx] = 1.0
+            self._one_hot_cache[name] = vec
+        # Cache the zero vector for unknown
+        self._zero_vector = np.zeros(len(self.COMMANDERS), dtype=np.float32)
 
     def encode(self, commander_name: str) -> np.ndarray:
-        encoding = np.zeros(len(self.COMMANDERS), dtype=np.float32)
-        if commander_name in self.name_to_idx:
-            encoding[self.name_to_idx[commander_name]] = 1.0
-        return encoding
+        return self._one_hot_cache.get(commander_name, self._zero_vector).copy()
+
+    def encode_into(self, commander_name: str, buf: np.ndarray, offset: int) -> int:
+        """Encode commander name directly into buffer without allocation."""
+        cached = self._one_hot_cache.get(commander_name, self._zero_vector)
+        buf[offset : offset + len(cached)] = cached
+        return offset + len(cached)
 
 
 class SkillEncoder:
@@ -234,14 +269,20 @@ class SkillEncoder:
 
     def __init__(self):
         self.name_to_idx = {name: i for i, name in enumerate(self.SKILLS)}
+        # Cache individual one-hot vectors for multi-hot encoding
+        self._one_hot_cache = {}
+        for name, idx in self.name_to_idx.items():
+            vec = np.zeros(len(self.SKILLS), dtype=np.float32)
+            vec[idx] = 1.0
+            self._one_hot_cache[name] = vec
 
     def encode(self, skill_names: List[str]) -> np.ndarray:
         """将技能列表编码为multi-hot向量"""
-        encoding = np.zeros(len(self.SKILLS), dtype=np.float32)
+        result = np.zeros(len(self.SKILLS), dtype=np.float32)
         for name in skill_names:
-            if name in self.name_to_idx:
-                encoding[self.name_to_idx[name]] = 1.0
-        return encoding
+            if name in self._one_hot_cache:
+                result += self._one_hot_cache[name]
+        return result
 
 
 class StateEncoder:
@@ -252,7 +293,7 @@ class StateEncoder:
     BELIEF_MIN = 0.05  # Minimum belief probability to prevent zeroing out
     BELIEF_MAX = 0.9  # Maximum belief probability
 
-    def __init__(self, config: EncodingConfig = None):
+    def __init__(self, config: Optional[EncodingConfig] = None):
         self.config = config or EncodingConfig()
 
         self.card_name_encoder = CardNameEncoder()
@@ -261,6 +302,11 @@ class StateEncoder:
         self.skill_encoder = SkillEncoder()
 
         self._update_config()
+
+        # Pre-allocated output buffer for in-place encoding
+        self._output_buffer: Optional[np.ndarray] = None
+        self._buffer_player_num: int = 0
+        self._offsets: Dict[str, int] = {}
 
         # Belief state storage: {observer_idx: {target_idx: belief_array}}
         # belief_array: [P(忠臣), P(反贼), P(内奸), P(unknown)]
@@ -465,48 +511,522 @@ class StateEncoder:
             if observer_idx in self._belief_history:
                 del self._belief_history[observer_idx]
 
+    def _get_attr(self, obj, attr: str, default):
+        """Safe attribute accessor with default value."""
+        if obj is None:
+            return default
+        if isinstance(obj, dict):
+            return obj.get(attr, default)
+        return getattr(obj, attr, default)
+
+    def _ensure_buffer(self, player_num: int) -> None:
+        """Ensure output buffer is allocated for given player count."""
+        if self._output_buffer is None or self._buffer_player_num != player_num:
+            state_dim = self._compute_state_dim(player_num)
+            self._output_buffer = np.zeros(state_dim, dtype=np.float32)
+            self._buffer_player_num = player_num
+            self._compute_offsets(player_num)
+
+    def _compute_state_dim(self, player_num: int) -> int:
+        card_dim = self.config.num_card_types + self.config.num_card_names + 7
+        max_hand = self.config.max_hand_size
+        other_players = 7 * 81
+        max_actions = self.config.max_history_actions
+        action_dim = (
+            self.config.num_action_types
+            + self.config.num_card_names
+            + self.config.max_players
+        )
+        char_dim = len(CommanderEncoder.COMMANDERS) + 4 + self.config.num_skills * 2
+
+        return (
+            34
+            + 8
+            + max_hand * card_dim
+            + 25
+            + 3
+            + char_dim
+            + other_players
+            + max_actions * action_dim
+            + 12
+        )
+
+    def _compute_offsets(self, player_num: int) -> None:
+        card_dim = self.config.num_card_types + self.config.num_card_names + 7
+        max_hand = self.config.max_hand_size
+        other_players = 7 * 81
+        max_actions = self.config.max_history_actions
+        action_dim = (
+            self.config.num_action_types
+            + self.config.num_card_names
+            + self.config.max_players
+        )
+        char_dim = len(CommanderEncoder.COMMANDERS) + 4 + self.config.num_skills * 2
+
+        self._offsets = {
+            "global": 0,
+            "player_basic": 34,
+            "hand_cards": 34 + 8,
+            "equipment": 34 + 8 + max_hand * card_dim,
+            "judge_area": 34 + 8 + max_hand * card_dim + 25,
+            "character": 34 + 8 + max_hand * card_dim + 25 + 3,
+            "other_players": 34 + 8 + max_hand * card_dim + 25 + 3 + char_dim,
+            "action_history": 34
+            + 8
+            + max_hand * card_dim
+            + 25
+            + 3
+            + char_dim
+            + other_players,
+            "skill_decision": 34
+            + 8
+            + max_hand * card_dim
+            + 25
+            + 3
+            + char_dim
+            + other_players
+            + max_actions * action_dim,
+        }
+
     def encode(self, game_state: Dict, player_idx: int) -> np.ndarray:
+        """编码完整游戏状态 (in-place version for performance)"""
+        players = game_state.get("players", [])
+        player_num = len(players) if players else 5
+
+        self._ensure_buffer(player_num)
+        assert self._output_buffer is not None
+        self._output_buffer.fill(0)
+
+        offset = 0
+
+        # 1. Global state
+        offset = self._encode_global_state_inplace(game_state, player_idx, offset)
+
+        # 2. Player basic
+        player = players[player_idx] if player_idx < len(players) else {}
+        offset = self._encode_player_basic_inplace(player, offset)
+
+        # 3. Hand cards
+        offset = self._encode_hand_cards_inplace(player, offset)
+
+        # 4. Equipment
+        offset = self._encode_equipment_inplace(player, offset)
+
+        # 5. Judge area
+        offset = self._encode_judge_area_inplace(player, offset)
+
+        # 6. Character
+        offset = self._encode_character_inplace(player, offset)
+
+        # 7. Other players
+        offset = self._encode_other_players_inplace(game_state, player_idx, offset)
+
+        # 8. Action history
+        offset = self._encode_action_history_inplace(game_state, offset)
+
+        # 9. Skill decision state
+        offset = self._encode_skill_decision_state_inplace(game_state, offset)
+
+        return self._output_buffer.copy()
+
+    def _encode_global_state_inplace(
+        self, state: Dict, player_idx: int, offset: int
+    ) -> int:
+        buf = self._output_buffer
+        assert buf is not None
+
+        phase_map = {
+            "waiting": 0,
+            "turn_start": 1,
+            "judge_phase": 2,
+            "draw_phase": 3,
+            "play_phase": 4,
+            "discard_phase": 5,
+            "turn_end": 6,
+            "game_over": 7,
+        }
+        phase_str = state.get("phase", "waiting")
+        if isinstance(phase_str, str):
+            buf[offset + phase_map.get(phase_str, 0)] = 1.0
+        offset += 8
+
+        # Round number (1 dim)
+        round_num = state.get("round_num", 1)
+        buf[offset] = min(round_num / 50.0, 1.0)
+        offset += 1
+
+        # Current player idx one-hot (8 dims)
+        current_idx = state.get("current_player_idx", 0)
+        if 0 <= current_idx < 8:
+            buf[offset + current_idx] = 1.0
+        offset += 8
+
+        # My idx one-hot (8 dims)
+        if 0 <= player_idx < 8:
+            buf[offset + player_idx] = 1.0
+        offset += 8
+
+        # Deck count (1 dim)
+        deck_count = state.get("deck_count", 0)
+        buf[offset] = min(deck_count / 100.0, 1.0)
+        offset += 1
+
+        # Discard count (1 dim)
+        discard_count = state.get("discard_pile_count", 0)
+        buf[offset] = min(discard_count / 50.0, 1.0)
+        offset += 1
+
+        # Player count one-hot (7 dims for 2-8 players)
+        player_count = len(state.get("players", []))
+        if 2 <= player_count <= 8:
+            buf[offset + (player_count - 2)] = 1.0
+        offset += 7
+
+        return offset
+
+    def _encode_player_basic_inplace(self, player, offset: int) -> int:
+        buf = self._output_buffer
+        assert buf is not None
+
+        hp = self._get_attr(player, "current_hp", 1)
+        max_hp = self._get_attr(player, "max_hp", 4)
+        buf[offset] = hp / max_hp if max_hp > 0 else 0.0
+        offset += 1
+
+        buf[offset] = max_hp / 10.0
+        offset += 1
+
+        buf[offset] = 1.0 if self._get_attr(player, "is_alive", True) else 0.0
+        offset += 1
+
+        buf[offset] = 1.0 if self._get_attr(player, "is_chained", False) else 0.0
+        offset += 1
+
+        buf[offset] = self._get_attr(player, "sha_count", 0) / 3.0
+        offset += 1
+
+        buf[offset] = self._get_attr(player, "jiu_count", 0) / 2.0
+        offset += 1
+
+        buf[offset] = 1.0 if self._get_attr(player, "jiu_effect", False) else 0.0
+        offset += 1
+
+        buf[offset] = len(self._get_attr(player, "hand_cards", [])) / 20.0
+        offset += 1
+
+        return offset
+
+    def _encode_hand_cards_inplace(self, player, offset: int) -> int:
+        buf = self._output_buffer
+        assert buf is not None
+        max_hand = self.config.max_hand_size
+        card_dim = self.config.num_card_types + self.config.num_card_names + 7
+
+        hand_cards = self._get_attr(player, "hand_cards", [])
+
+        for i, card in enumerate(hand_cards[:max_hand]):
+            card_offset = offset + i * card_dim
+
+            card_type = self._get_attr(card, "card_type", "")
+            card_type_dim = self.config.num_card_types
+            self.card_type_encoder.encode_into(card_type, buf, card_offset)
+
+            card_name = self._get_attr(card, "name", "")
+            self.card_name_encoder.encode_into(
+                card_name, buf, card_offset + card_type_dim
+            )
+
+            color_dim = 4
+            color = self._get_attr(card, "color", "")
+            color_map = {"黑桃": 0, "红桃": 1, "梅花": 2, "方块": 3}
+            if color in color_map:
+                buf[
+                    card_offset
+                    + card_type_dim
+                    + self.config.num_card_names
+                    + color_map[color]
+                ] = 1.0
+
+            attr_offset = (
+                card_offset + card_type_dim + self.config.num_card_names + color_dim
+            )
+            buf[attr_offset] = self._get_attr(card, "point", 0) / 13.0
+            buf[attr_offset + 1] = 1.0 if color in ("红桃", "方块") else 0.0
+            buf[attr_offset + 2] = 1.0 if color in ("黑桃", "梅花") else 0.0
+
+        return offset + max_hand * card_dim
+
+    def _encode_equipment_inplace(self, player, offset: int) -> int:
+        buf = self._output_buffer
+        assert buf is not None
+        equipment = self._get_attr(player, "equipment", {})
+
+        weapons = [
+            "",
+            "诸葛连弩",
+            "青釭剑",
+            "青龙偃月刀",
+            "丈八蛇矛",
+            "贯石斧",
+            "方天画戟",
+            "麒麟弓",
+            "朱雀羽扇",
+            "古锭刀",
+            "吴六剑",
+            "三尖两刃刀",
+            "太平要术",
+            "木牛流马",
+            "红桃5麒麟弓",
+        ]
+        weapon_name = (
+            self._get_attr(equipment.get("weapon", None), "name", "")
+            if equipment.get("weapon")
+            else ""
+        )
+        if weapon_name in weapons:
+            buf[offset + weapons.index(weapon_name)] = 1.0
+        offset += 15
+
+        armours = ["", "八卦阵", "仁王盾", "白银狮子", "藤甲"]
+        armour_name = (
+            self._get_attr(equipment.get("armour", None), "name", "")
+            if equipment.get("armour")
+            else ""
+        )
+        if armour_name in armours:
+            buf[offset + armours.index(armour_name)] = 1.0
+        offset += 7
+
+        buf[offset] = 1.0 if equipment.get("attack_horse") else 0.0
+        offset += 1
+
+        buf[offset] = 1.0 if equipment.get("defense_horse") else 0.0
+        offset += 1
+
+        buf[offset] = 1.0 if equipment.get("treasure") else 0.0
+        offset += 1
+
+        return offset
+
+    def _encode_judge_area_inplace(self, player, offset: int) -> int:
+        buf = self._output_buffer
+        assert buf is not None
+        judge_area = self._get_attr(player, "judge_area", [])
+
+        buf[offset] = (
+            1.0 if any(c.get("name") == "乐不思蜀" for c in judge_area) else 0.0
+        )
+        buf[offset + 1] = (
+            1.0 if any(c.get("name") == "兵粮寸断" for c in judge_area) else 0.0
+        )
+        buf[offset + 2] = (
+            1.0 if any(c.get("name") == "闪电" for c in judge_area) else 0.0
+        )
+
+        return offset + 3
+
+    def _encode_character_inplace(self, player, offset: int) -> int:
+        buf = self._output_buffer
+        assert buf is not None
+
+        commander_name = self._get_attr(player, "commander_name", "")
+        offset = self.commander_encoder.encode_into(commander_name, buf, offset)
+
+        nation_encoding = np.zeros(4, dtype=np.float32)
+        nation_map = {"魏": 0, "蜀": 1, "吴": 2, "群": 3}
+        nation = self._get_attr(player, "nation", "")
+        if nation in nation_map:
+            buf[offset + nation_map[nation]] = 1.0
+        offset += 4
+
+        skills = self._get_attr(player, "skills", [])
+        if skills and isinstance(skills[0], str):
+            skill_names = skills
+        else:
+            skill_names = [s.name for s in skills if hasattr(s, "name")]
+
+        for name in skill_names:
+            idx = self.skill_encoder.name_to_idx.get(name)
+            if idx is not None:
+                buf[offset + idx] = 1.0
+        offset += self.config.num_skills
+
+        # Skill used multi-hot (36 dims) - placeholder zeros
+        offset += self.config.num_skills
+
+        return offset
+
+    def _encode_other_players_inplace(
+        self, game_state: Dict, player_idx: int, offset: int
+    ) -> int:
+        buf = self._output_buffer
+        assert buf is not None
+        players = game_state.get("players", [])
+        other_player_dim = 81
+
+        for i, p in enumerate(players):
+            if i == player_idx:
+                continue
+
+            po = offset
+
+            buf[po + i] = 1.0
+            po += 8
+
+            hp = self._get_attr(p, "current_hp", 1)
+            max_hp = self._get_attr(p, "max_hp", 4)
+            buf[po] = hp / max_hp if max_hp > 0 else 0.0
+            po += 1
+
+            buf[po] = max_hp / 10.0
+            po += 1
+
+            buf[po] = 1.0 if self._get_attr(p, "is_alive", True) else 0.0
+            po += 1
+
+            buf[po] = 1.0 if self._get_attr(p, "is_chained", False) else 0.0
+            po += 1
+
+            buf[po] = len(self._get_attr(p, "hand_cards", [])) / 20.0
+            po += 1
+
+            identity = self._get_attr(p, "identity", "")
+            identity_map = {"忠臣": 0, "反贼": 1, "内奸": 2}
+            if identity in identity_map:
+                buf[po + identity_map[identity]] = 1.0
+            po += 4
+
+            buf[po] = 1.0 if identity else 0.0
+            po += 1
+
+            po += 4
+
+            nation = self._get_attr(p, "nation", "")
+            nation_map = {"魏": 0, "蜀": 1, "吴": 2, "群": 3}
+            if nation in nation_map:
+                buf[po + nation_map[nation]] = 1.0
+            po += 4
+
+            commander_name = self._get_attr(p, "commander_name", "")
+            self.commander_encoder.encode_into(commander_name, buf, po)
+            po += len(self.commander_encoder.COMMANDERS)
+
+            po = self._encode_equipment_inplace(p, po)
+            po = self._encode_judge_area_inplace(p, po)
+
+            buf[po] = 0.5
+            po += 1
+
+            buf[po] = 0.5
+            po += 1
+
+            offset += other_player_dim
+
+        while (
+            (offset - self._offsets["other_players"])
+            < (len(players) - 1) * other_player_dim
+            if len(players) > 1
+            else 7 * other_player_dim
+        ):
+            offset += other_player_dim
+
+        return offset
+
+    def _encode_action_history_inplace(self, game_state: Dict, offset: int) -> int:
+        buf = self._output_buffer
+        assert buf is not None
+        history = game_state.get("action_history", [])
+        max_actions = self.config.max_history_actions
+        action_dim = (
+            self.config.num_action_types
+            + self.config.num_card_names
+            + self.config.max_players
+        )
+
+        for i, action in enumerate(history[-max_actions:]):
+            ao = offset + i * action_dim
+
+            action_type = action.get("action_type", 0)
+            if 0 <= action_type < self.config.num_action_types:
+                buf[ao + action_type] = 1.0
+
+            card_name = action.get("card_name", "")
+            self.card_name_encoder.encode_into(
+                card_name, buf, ao + self.config.num_action_types
+            )
+
+            target_idx = action.get("target_idx", -1)
+            if target_idx is not None and 0 <= target_idx < self.config.max_players:
+                buf[
+                    ao
+                    + self.config.num_action_types
+                    + self.config.num_card_names
+                    + target_idx
+                ] = 1.0
+
+        return offset + max_actions * action_dim
+
+    def _encode_skill_decision_state_inplace(
+        self, game_state: Dict, offset: int
+    ) -> int:
+        buf = self._output_buffer
+        assert buf is not None
+
+        buf[offset] = 1.0 if game_state.get("phase") == "skill_decision" else 0.0
+        buf[offset + 1] = 0.0
+        buf[offset + 2] = 0.0
+        buf[offset + 3] = 0.0
+        offset += 4
+
+        buf[offset : offset + 7] = 0.0
+        offset += 7
+
+        buf[offset] = 0.5
+        offset += 1
+
+        return offset
+
+    def fast_encode(self, game_state: Dict, player_idx: int) -> np.ndarray:
+        return self.encode(game_state, player_idx)
+
+    def encode_batch(self, game_state: Dict, agent_indices: List[int]) -> np.ndarray:
         """
-        编码完整游戏状态
+        Batch encode state for multiple agents.
 
         Args:
-                game_state: 游戏状态字典
-                player_idx: 当前AI控制的玩家索引 (0-based)
+            game_state: Game state dictionary
+            agent_indices: List of agent indices to encode for
 
         Returns:
-                编码后的状态向量
+            np.ndarray of shape (num_agents, state_dim)
         """
-        parts = []
+        num_agents = len(agent_indices)
+        players = game_state.get("players", [])
+        state_dim = self.get_state_dim(len(players))
+        result = np.zeros((num_agents, state_dim), dtype=np.float32)
 
-        # 1. 全局状态
-        parts.append(self._encode_global_state(game_state, player_idx))
+        # Pre-compute shared components
+        shared_history = self._encode_action_history(game_state)
+        shared_skill_state = self._encode_skill_decision_state(game_state)
 
-        # 2. 当前玩家状态
-        player = game_state["players"][player_idx]
-        parts.append(self._encode_player_basic(player))
+        for i, agent_idx in enumerate(agent_indices):
+            if agent_idx >= len(players):
+                continue
+            player = players[agent_idx]
+            parts = [
+                self._encode_global_state(game_state, agent_idx),
+                self._encode_player_basic(player),
+                self._encode_hand_cards(player),
+                self._encode_equipment(player),
+                self._encode_judge_area(player),
+                self._encode_character(player),
+                self._encode_other_players(game_state, agent_idx),
+                shared_history,
+                shared_skill_state,
+            ]
+            result[i] = np.concatenate(parts)
 
-        # 3. 手牌编码
-        parts.append(self._encode_hand_cards(player))
-
-        # 4. 装备状态
-        parts.append(self._encode_equipment(player))
-
-        # 5. 判定区
-        parts.append(self._encode_judge_area(player))
-
-        # 6. 武将/技能
-        parts.append(self._encode_character(player))
-
-        # 7. 其他玩家
-        parts.append(self._encode_other_players(game_state, player_idx))
-
-        # 8. 历史动作
-        parts.append(self._encode_action_history(game_state))
-
-        # 9. 技能决策状态
-        parts.append(self._encode_skill_decision_state(game_state))
-
-        return np.concatenate(parts)
+        return result
 
     def _encode_global_state(self, state: Dict, player_idx: int) -> np.ndarray:
         """编码全局状态 (34维)"""
@@ -631,7 +1151,7 @@ class StateEncoder:
             else:
                 encoded_cards[i] = self._encode_single_card_from_object(card)
 
-        return encoded_cards.flatten()
+        return encoded_cards.reshape(-1)
 
     def _encode_single_card(self, card: Dict) -> np.ndarray:
         """编码单张卡牌"""
@@ -933,28 +1453,27 @@ class StateEncoder:
     def _encode_identity_belief(
         self, player: Dict, state: Dict, observer_idx: int
     ) -> np.ndarray:
-        """编码身份信念状态 (4维)
-
-        Returns:
-            np.ndarray: [P(忠臣), P(反贼), P(内奸), P(unknown)]
-            - 主公: [1, 0, 0, 0] (known)
-            - 其他: use learned belief or uniform [0.33, 0.33, 0.33, 0.01]
-        """
         identity = player.get("identity", "")
         player_idx = (
             state.get("players", []).index(player) if state.get("players") else -1
         )
 
+        if self.config.reveal_all_identities:
+            if identity == "主公":
+                return np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+            elif identity == "忠臣":
+                return np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+            elif identity == "反贼":
+                return np.array([0.0, 1.0, 0.0, 0.0], dtype=np.float32)
+            elif identity == "内奸":
+                return np.array([0.0, 0.0, 1.0, 0.0], dtype=np.float32)
+
         if identity == "主公":
-            # 主公身份公开
             return np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
         elif player_idx >= 0 and observer_idx in self._belief_states:
-            # Use learned belief if available
             if player_idx in self._belief_states[observer_idx]:
                 return self._belief_states[observer_idx][player_idx].copy()
 
-        # Default: uniform distribution for unknown identities
-        # [P(忠臣), P(反贼), P(内奸), P(unknown)]
         return np.array([0.33, 0.33, 0.33, 0.01], dtype=np.float32)
 
     def _estimate_threat(self, player: Dict) -> float:

@@ -194,6 +194,8 @@ class ActionMaskGenerator:
     def __init__(self, encoder: ActionEncoder, state_encoder=None):
         self.encoder = encoder
         self.state_encoder = state_encoder  # For accessing belief states
+        self._cache = {}
+        self._cache_round = -1
 
     # Identity-aware masking constants
     BENEFIT_CARD_NAMES = {"桃", "酒", "无中生有", "桃园结义", "五谷丰登"}
@@ -232,6 +234,15 @@ class ActionMaskGenerator:
         Returns:
                 (masks_type, masks_card, masks_target)
         """
+        round_num = game_state.get("round_num", 0)
+        player_idx = self._get_attr(player, "idx") or self._get_attr(
+            player, "player_idx", 0
+        )
+        cache_key = (round_num, player_idx, current_step)
+
+        if round_num == self._cache_round and cache_key in self._cache:
+            return self._cache[cache_key]
+
         # Determine observer_idx from player if not provided
         if observer_idx is None and player is not None:
             observer_idx = self._get_attr(player, "idx") or self._get_attr(
@@ -262,7 +273,16 @@ class ActionMaskGenerator:
             masks_card = np.zeros(self.encoder.card_dim, dtype=np.float32)
             masks_target = np.zeros(self.encoder.target_dim, dtype=np.float32)
 
-        return masks_type, masks_card, masks_target
+        result = (masks_type, masks_card, masks_target)
+        if round_num != self._cache_round:
+            self._cache.clear()
+            self._cache_round = round_num
+        self._cache[cache_key] = result
+        return result
+
+    def clear_cache(self):
+        self._cache.clear()
+        self._cache_round = -1
 
     def _get_valid_action_types(
         self, game_state: Dict, player, engine=None
