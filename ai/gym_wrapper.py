@@ -143,6 +143,8 @@ class SGSEnv(_BaseEnv):
 
         self._winner: Optional[str] = None
 
+        self._cached_game_state: Optional[Dict] = None
+
         self._prev_hp: Dict[int, int] = {}
         self._prev_alive: Dict[int, bool] = {}
         self._pending_rewards: float = 0.0
@@ -548,6 +550,7 @@ class SGSEnv(_BaseEnv):
         self._total_steps += 1
         self._prof_game_state_dict_calls = 0
         self._prof_step_number += 1
+        self._cached_game_state = None  # Cache invalidated per step
 
         # CRITICAL FIX: Remove auto-resolution - RL must make skill decisions
         # Return skill decision observation when pending, let RL choose
@@ -592,6 +595,7 @@ class SGSEnv(_BaseEnv):
         )
 
         self._process_action(action)
+        self._cached_game_state = None  # Invalidate cache after state change
 
         done = self._check_done()
 
@@ -610,10 +614,6 @@ class SGSEnv(_BaseEnv):
         if done:
             info["winner"] = self._winner
             info["player_identity"] = self.players[self.current_player_idx].identity
-
-        print(
-            f"[PROF] step {self._prof_step_number}: _get_game_state_dict calls = {self._prof_game_state_dict_calls}"
-        )
 
         clear_current_env()
         return obs, reward, done, truncated, info
@@ -1083,7 +1083,11 @@ class SGSEnv(_BaseEnv):
         return obs
 
     def _get_game_state_dict(self) -> Dict:
+        if self._cached_game_state is not None:
+            return self._cached_game_state
+
         self._prof_game_state_dict_calls += 1
+
         if self.engine is None:
             return {"players": [], "phase": "waiting"}
 
@@ -1092,6 +1096,7 @@ class SGSEnv(_BaseEnv):
 
         state_dict["action_history"] = self.action_history[-10:]
 
+        self._cached_game_state = state_dict
         return state_dict
 
     def _get_action_masks(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -1181,9 +1186,6 @@ class SGSEnv(_BaseEnv):
         request = self.skill_decision_context.active_request
         if request is None:
             obs = self._get_observation()
-            print(
-                f"[PROF] step {self._prof_step_number}: _get_game_state_dict calls = {self._prof_game_state_dict_calls}"
-            )
             return obs, 0.0, False, False, {"error": "No pending decision"}
 
         action = int(action)
@@ -1191,9 +1193,6 @@ class SGSEnv(_BaseEnv):
 
         if action < 0 or action >= len(mask) or mask[action] == 0:
             obs = self._get_observation()
-            print(
-                f"[PROF] step {self._prof_step_number}: _get_game_state_dict calls = {self._prof_game_state_dict_calls}"
-            )
             return obs, -0.1, False, False, {"error": "Invalid skill decision"}
 
         from ai.skill_decision import SkillDecisionType
@@ -1286,9 +1285,6 @@ class SGSEnv(_BaseEnv):
         info["skill_decision_complete"] = request.is_resolved
         info["skill_decision_reward"] = skill_reward
 
-        print(
-            f"[PROF] step {self._prof_step_number}: _get_game_state_dict calls = {self._prof_game_state_dict_calls}"
-        )
         return obs, skill_reward, False, False, info
 
     def _get_skill_decision_mask(self) -> np.ndarray:
