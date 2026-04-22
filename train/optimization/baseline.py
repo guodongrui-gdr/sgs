@@ -197,6 +197,7 @@ def main():
         num_eval_episodes=args.eval_episodes,
         device=args.device,
         seed=args.seed,
+        max_rounds=80,
     )
 
     from train.train import Trainer
