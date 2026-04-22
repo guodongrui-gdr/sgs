@@ -57,8 +57,10 @@ def run_evaluation_episode(
     episode_reward = 0.0
     episode_steps = 0
     done = False
+    stagnation_count = 0
+    last_reward = 0.0
 
-    while not done and episode_steps < 5000:
+    while not done and episode_steps < 500:
         current_player_idx = eval_env.current_player_idx
         players = eval_env.players
 
@@ -80,10 +82,29 @@ def run_evaluation_episode(
                 obs, reward, terminated, truncated, info = eval_env.step(action)
                 episode_reward += reward
                 done = terminated or truncated
+                if episode_reward == last_reward:
+                    stagnation_count += 1
+                else:
+                    stagnation_count = 0
+                    last_reward = episode_reward
+                if stagnation_count >= 50:
+                    done = True
             except Exception:
-                obs, info = eval_env.reset()
+                if mask is not None:
+                    valid_actions = np.where(mask > 0)[0]
+                    if len(valid_actions) > 0:
+                        action = np.random.choice(valid_actions)
+                        try:
+                            obs, reward, terminated, truncated, info = eval_env.step(
+                                action
+                            )
+                            episode_reward += reward
+                            done = terminated or truncated
+                            episode_steps += 1
+                            continue
+                        except Exception:
+                            pass
                 done = True
-                episode_reward = 0.0
 
         episode_steps += 1
 
