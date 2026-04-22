@@ -60,7 +60,7 @@ def run_evaluation_episode(
     stagnation_count = 0
     last_reward = 0.0
 
-    while not done and episode_steps < 500:
+    while not done and episode_steps < 2000:
         current_player_idx = eval_env.current_player_idx
         players = eval_env.players
 
